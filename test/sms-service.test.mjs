@@ -47,6 +47,29 @@ async function complete(service) {
   return service.routeLoginSubmit(req('submit', { flowId: await begin(service), code: '123456' }))
 }
 
+test('SMS transport streams bounded bodies and accepts the admitted browser Host rather than the internal bridge URL', async (t) => {
+  const { routes } = setup(t)
+  const route = routes.get('/api/mys/login/start')
+  assert.equal(route.requestBody, 'streaming')
+  const browserRequest = (origin) => new Request('http://dsh.internal/api/mys/login/start', { method: 'POST', headers: { host: '127.0.0.1:52370', origin, 'content-type': 'application/json', 'sec-fetch-site': 'same-origin' }, body: JSON.stringify({ phone: '13800138000' }) })
+  assert.equal((await (await route.fetch(browserRequest('http://127.0.0.1:52370'))).json()).ok, true)
+  assert.equal((await (await route.fetch(browserRequest('http://evil.invalid'))).json()).ok, false)
+})
+
+test('only the owner-registered CAPTCHA document route returns static HTML instead of a JSON envelope', async (t) => {
+  const { routes, service, calls } = setup(t)
+  const route = routes.get('/api/mys/login/captcha-frame')
+  assert.ok(route)
+  assert.deepEqual(route.methods, ['GET'])
+  const result = await route.fetch(new Request('http://owner.invalid/api/mys/login/captcha-frame'))
+  assert.match(result.headers.get('content-type'), /^text\/html/)
+  assert.equal(result.headers.get('cache-control'), 'no-store')
+  assert.match(await result.text(), /<!doctype html>/)
+  assert.equal(calls.length, 0)
+  const other = await service.guard(() => new Response('not the frame'), new Request('http://owner.invalid'))
+  assert.match(other.headers.get('content-type'), /application\/json/)
+})
+
 test('SMS owner routes replace polling; read-only state never dispatches an official request', async (t) => {
   const { service, routes, calls } = setup(t)
   assert.equal(routes.has('/api/mys/login/poll'), false)

@@ -90,12 +90,11 @@ window.__ModuleLoader__.load({
 .mys-log[data-level=error] .mys-log-text{color:#a3231c}
 .mys-empty{font-size:12px;color:var(--dsw-alias-label-tertiary)}
 .mys-overlay{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;background:rgba(15,23,42,.45);padding:24px}
-.mys-dialog{box-sizing:border-box;width:min(380px,100%);background:var(--dsw-alias-bg-layer-1,#fff);border-radius:14px;padding:20px;display:flex;flex-direction:column;gap:12px;box-shadow:0 24px 60px rgba(0,0,0,.35);color:var(--dsw-alias-label-primary)}
+.mys-captcha-frame{width:100%;height:420px;border:0;background:#fff;border-radius:8px}
+.mys-dialog form{display:flex;flex-direction:column;gap:12px}
+.mys-dialog{max-height:calc(100dvh - 48px);overflow:auto;box-sizing:border-box;width:min(380px,100%);background:var(--dsw-alias-bg-layer-1,#fff);border-radius:14px;padding:20px;display:flex;flex-direction:column;gap:12px;box-shadow:0 24px 60px rgba(0,0,0,.35);color:var(--dsw-alias-label-primary)}
 .mys-dialog-title{margin:0;font-size:16px;font-weight:600}
-.mys-qr{display:flex;align-items:center;justify-content:center;padding:8px;background:#fff;border-radius:10px;min-height:232px}
-.mys-qr img{width:232px;height:232px;display:block;image-rendering:pixelated}
-.mys-qr-state{font-size:13px;line-height:20px;text-align:center;color:var(--dsw-alias-label-secondary,#4b5563)}
-.mys-dialog-foot{display:flex;gap:8px;justify-content:flex-end}
+.mys-dialog-foot{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end}
 .mys-details{font-size:13px}
 .mys-details summary{cursor:pointer;color:var(--dsw-alias-label-secondary,#4b5563);font-size:13px;line-height:22px}
 .mys-details[open] summary{margin-bottom:8px}
@@ -148,6 +147,29 @@ window.__ModuleLoader__.load({
 `
 
     const zh = {
+      smsTitle: "短信登录米游社",
+      smsHint: "仅支持中国大陆 +86 手机号。点击发送后才会请求短信；如遇风控，请在下方亲自完成官方验证。不会自动重发。",
+      smsPhone: "手机号（+86）",
+      smsCode: "6 位短信验证码",
+      smsSend: "发送验证码",
+      smsResend: "重新发送",
+      smsSubmit: "验证并登录",
+      smsCancel: "取消",
+      smsBusy: "正在处理，请稍候…",
+      smsBadPhone: "请输入有效的 11 位大陆手机号。",
+      smsBadCode: "请输入 6 位短信验证码。",
+      smsWrongCode: "验证码不正确或已失效，请重新输入。",
+      smsFailed: "请求未完成。请检查状态后重试；若发送结果不明，请先等待短信，不会自动重发。",
+      smsCooldown: "请等待倒计时结束后再发送。",
+      smsRateLimited: "请求过于频繁，请稍后重新登录。",
+      smsExpired: "本轮登录已失效或无法继续，请取消后重新登录。",
+      smsCountdown: "{seconds} 秒后可重新发送",
+      smsCodeSent: "短信已发送，请输入验证码。",
+      smsVerification: "官方人工验证",
+      smsWidgetLoading: "正在加载官方验证…",
+      smsWidgetFailed: "人工验证未完成或加载失败。请取消后重新登录；不会自动发送短信。",
+      smsSuccess: "登录成功，凭据已完成只读校验。",
+      smsSuccessWarning: "游戏凭据校验通过；社区只读校验未通过，请查看社区状态。",
       communityTitle: "社区签到 · 米游币",
       communityDesc: "默认关闭。启用后随现有定时窗口运行；仅签到，不看帖、点赞或分享。",
       communityEnabled: "启用社区签到",
@@ -155,8 +177,8 @@ window.__ModuleLoader__.load({
       communityRun: "立即社区签到",
       communityOff: "社区签到已关闭",
       communityEmpty: "请选择至少一个签到分区",
-      communityNoToken: "社区凭据不完整，请重新使用 App 扫码获取 SToken；不影响游戏登录。",
-      communityMissingMid: "V2 社区凭据缺少必要信息，请重新使用 App 扫码；不影响游戏登录。",
+      communityNoToken: "社区凭据不完整，请重新短信登录；不影响游戏登录。",
+      communityMissingMid: "V2 社区凭据缺少必要信息，请重新短信登录；不影响游戏登录。",
       communityPending: "设置尚未保存生效，请稍候。",
       communityPartial: "本轮社区签到有未完成分区",
       communityAccepted: "接口已接受全部分区签到；积分到账未独立验证。",
@@ -176,7 +198,7 @@ window.__ModuleLoader__.load({
       communityOutcomeCaptcha: "待人工验证",
       communityOutcomeUnknown: "结果不明",
       communityOutcomeAuth: "社区凭据不可用",
-      communityOutcomeExpired: "社区凭据已失效，请重新 App 扫码",
+      communityOutcomeExpired: "社区凭据已失效，请重新短信登录",
       communityOutcomeError: "失败",
       communityOutcomeSkipped: "未执行",
       outcomeSkipped: "未执行",
@@ -184,14 +206,14 @@ window.__ModuleLoader__.load({
       title: '米游社签到',
       intro: '游戏与主动启用的社区签到共用每日随机时间窗口；两个手动按钮各自独立。登录凭据只保存在本机。',
       account: '账号',
-      accountDesc: '使用米游社 App 扫码获取 SToken；可用它派生游戏凭据，不会更新 SToken 本身。',
-      login: '扫码登录',
-      relogin: '重新扫码',
+      accountDesc: '使用大陆 +86 手机号短信登录。凭据仅保存于本机；SToken 失效后仍需重新登录。',
+      login: '短信登录',
+      relogin: '重新登录',
       refresh: '续期凭据',
       refreshing: '续期中…',
       noStoken: '当前凭据不含 SToken，无法自动续期。',
-      noStokenHint: '重新扫码会走 App 通道获取 SToken；SToken 自身失效时仍须重新扫码。',
-      upgradeLogin: '重新扫码获取 SToken',
+      noStokenHint: '请重新短信登录获取完整凭据；无法保证长期免登录。',
+      upgradeLogin: '短信登录获取 SToken',
       deleteLogin: '删除登录',
       deleteConfirm: '再次点击确认删除',
       loginDeleted: '登录数据已删除',
@@ -203,15 +225,6 @@ window.__ModuleLoader__.load({
       loginAt: '登录于',
       lastRefresh: '最近续期',
       never: '从未',
-      qrTitle: '扫码登录米游社',
-      qrHint: '打开米游社 App → 右上角扫一扫 → 确认登录。二维码仅在本机生成，不上传。',
-      qrPending: '等待扫码…',
-      qrScanned: '已扫码，请在手机上确认',
-      qrConfirmed: '登录成功，正在校验…',
-      qrExpired: '二维码已过期',
-      qrRefresh: '刷新二维码',
-      qrCancel: '取消',
-      qrChecking: '正在生成二维码…',
       auto: '自动签到',
       autoDesc: '开启后，每天只在时间窗口内执行一次；随机时刻可以避免整点请求特征。',
       enabled: '启用自动签到',
@@ -252,7 +265,6 @@ window.__ModuleLoader__.load({
       retry: '失败重试',
       retryAttempts: '重试次数',
       retryDelay: '重试间隔（秒）',
-      qrAge: '二维码有效期（秒）',
       logs: '运行日志',
       logsEmpty: '暂无日志。',
       saveOk: '已保存',
@@ -268,9 +280,6 @@ window.__ModuleLoader__.load({
       verifyAnon: '尚未登录，无法检测登录状态。',
       verifyFail: '网络不可达：{message}',
       verifyInvalid: '接口可用，但登录无效：{message}',
-      detectorOk: '二维码自检通过（浏览器可识别）',
-      detectorFail: '浏览器未能识别该二维码，建议刷新二维码后重试',
-      detectorUnavailable: '浏览器未提供二维码自检能力',
       riskTitle: '降低被风控的建议',
       riskList: '1) 每天只签一次，不要频繁手动补签。2) 保持固定的 device_id：本插件首次运行后不再更改，请不要删除状态文件。3) 不要在同一台机器上用同一个 DSH 反复登录多个账号。4) 触发验证码时先在米游社 App 内手动完成，不要连续重试。5) 网络出口尽量稳定，避免频繁更换 IP 或代理。',
       outcomeSigned: '成功',
@@ -333,6 +342,29 @@ window.__ModuleLoader__.load({
     }
 
     const en = {
+      smsTitle: "Sign in to miHoYo by SMS",
+      smsHint: "Mainland China +86 numbers only. SMS is requested only when you press Send. Complete any official verification below yourself. No automatic resend.",
+      smsPhone: "Mobile number (+86)",
+      smsCode: "6-digit SMS code",
+      smsSend: "Send code",
+      smsResend: "Resend code",
+      smsSubmit: "Verify and sign in",
+      smsCancel: "Cancel",
+      smsBusy: "Processing…",
+      smsBadPhone: "Enter a valid 11-digit mainland China mobile number.",
+      smsBadCode: "Enter the 6-digit SMS code.",
+      smsWrongCode: "The code is incorrect or expired. Please enter it again.",
+      smsFailed: "The request did not complete. Check the state before retrying. If delivery is uncertain, wait for the SMS; it is never resent automatically.",
+      smsCooldown: "Wait for the countdown before sending again.",
+      smsRateLimited: "Too many requests. Please sign in again later.",
+      smsExpired: "This login expired or cannot continue. Cancel and start again.",
+      smsCountdown: "Resend available in {seconds}s",
+      smsCodeSent: "SMS sent. Enter the verification code.",
+      smsVerification: "Official manual verification",
+      smsWidgetLoading: "Loading official verification…",
+      smsWidgetFailed: "Verification was not completed or could not load. Cancel and sign in again. No SMS was sent automatically.",
+      smsSuccess: "Signed in; read-only credential checks passed.",
+      smsSuccessWarning: "Game credentials verified; the community check did not pass. See community status.",
       communityTitle: "Community check-in · Coins",
       communityDesc: "Off by default. Uses the existing schedule; check-in only, without reading, liking or sharing posts.",
       communityEnabled: "Enable community check-in",
@@ -340,8 +372,8 @@ window.__ModuleLoader__.load({
       communityRun: "Check in to communities",
       communityOff: "Community check-in is off",
       communityEmpty: "Select at least one community",
-      communityNoToken: "Community credentials are incomplete. Scan again in the App to obtain SToken; game login is unaffected.",
-      communityMissingMid: "Required V2 community credentials are missing. Scan again in the App; game login is unaffected.",
+      communityNoToken: "Community credentials are incomplete. Sign in again by SMS; game login is unaffected.",
+      communityMissingMid: "Required V2 community credentials are missing. Sign in again by SMS; game login is unaffected.",
       communityPending: "Settings are not saved yet. Please wait.",
       communityPartial: "Some communities remain incomplete",
       communityAccepted: "All community requests were accepted; coin credit has not been independently verified.",
@@ -361,7 +393,7 @@ window.__ModuleLoader__.load({
       communityOutcomeCaptcha: "Manual verification required",
       communityOutcomeUnknown: "Unknown result",
       communityOutcomeAuth: "Community credentials unavailable",
-      communityOutcomeExpired: "Community credentials expired; scan again in the App",
+      communityOutcomeExpired: "Community credentials expired; sign in again by SMS",
       communityOutcomeError: "Failed",
       communityOutcomeSkipped: "Not executed",
       outcomeSkipped: "Not executed",
@@ -369,14 +401,14 @@ window.__ModuleLoader__.load({
       title: 'miHoYo check-in',
       intro: 'Games and opt-in community check-in share a randomized daily schedule. Each manual button runs only its own scope. Credentials stay local.',
       account: 'Account',
-      accountDesc: 'Scan with the App to obtain SToken and derive game credentials; this does not renew SToken itself.',
-      login: 'Scan to sign in',
-      relogin: 'Scan again',
+      accountDesc: 'Sign in with a mainland China +86 mobile number. Credentials stay on this device; an expired SToken requires signing in again.',
+      login: 'Sign in by SMS',
+      relogin: 'Sign in again',
       refresh: 'Refresh credentials',
       refreshing: 'Refreshing…',
       noStoken: 'This credential has no SToken, so it cannot be renewed automatically.',
-      noStokenHint: 'Scan again to use the app channel and obtain one.',
-      upgradeLogin: 'Scan again for SToken',
+      noStokenHint: 'Sign in again by SMS to obtain complete credentials. Permanent login is not guaranteed.',
+      upgradeLogin: 'Sign in by SMS for SToken',
       deleteLogin: 'Delete login',
       deleteConfirm: 'Click again to delete',
       loginDeleted: 'Login data deleted',
@@ -388,15 +420,6 @@ window.__ModuleLoader__.load({
       loginAt: 'Signed in',
       lastRefresh: 'Last refresh',
       never: 'never',
-      qrTitle: 'Sign in to miHoYo',
-      qrHint: 'Open the miHoYo app → Scan → Confirm. The QR code is generated locally.',
-      qrPending: 'Waiting for scan…',
-      qrScanned: 'Scanned — confirm on your phone',
-      qrConfirmed: 'Signed in, verifying…',
-      qrExpired: 'The QR code expired',
-      qrRefresh: 'New QR code',
-      qrCancel: 'Cancel',
-      qrChecking: 'Generating QR code…',
       auto: 'Automatic check-in',
       autoDesc: 'Runs once a day inside a window; the random moment avoids on-the-hour patterns.',
       enabled: 'Enable automatic check-in',
@@ -437,7 +460,6 @@ window.__ModuleLoader__.load({
       retry: 'Retry',
       retryAttempts: 'Attempts',
       retryDelay: 'Delay (s)',
-      qrAge: 'QR lifetime (s)',
       logs: 'Run log',
       logsEmpty: 'No log entries yet.',
       saveOk: 'Saved',
@@ -453,9 +475,6 @@ window.__ModuleLoader__.load({
       verifyAnon: 'Not signed in; nothing to verify.',
       verifyFail: 'Network unreachable: {message}',
       verifyInvalid: 'API reachable but the session is invalid: {message}',
-      detectorOk: 'QR self-check passed (decoded by the browser)',
-      detectorFail: 'The browser could not decode this QR code; refresh it',
-      detectorUnavailable: 'This browser offers no QR self-check',
       riskTitle: 'Lowering risk-control flags',
       riskList: '1) One run per day; avoid repeated manual retries. 2) Keep the device id stable: it never changes after first use, so do not delete the state file. 3) Do not sign several accounts in from the same device. 4) When a captcha appears, clear it in the miHoYo app instead of retrying. 5) Keep the network egress stable; avoid hopping IPs or proxies.',
       outcomeSigned: 'Signed',
@@ -765,52 +784,6 @@ window.__ModuleLoader__.load({
       return h('span', { className: 'mys-dot', 'data-state': state, 'aria-hidden': true })
     }
 
-    function useDetector(src) {
-      const [state, setState] = useState('idle')
-      useEffect(() => {
-        if (!src) return undefined
-        if (typeof BarcodeDetector === 'undefined') {
-          setState('unavailable')
-          return undefined
-        }
-        let cancelled = false
-        const image = new Image()
-        image.onload = () => {
-          const canvas = document.createElement('canvas')
-          canvas.width = image.naturalWidth
-          canvas.height = image.naturalHeight
-          const context = canvas.getContext('2d')
-          if (context === null) {
-            setState('unavailable')
-            return
-          }
-          context.drawImage(image, 0, 0)
-          let detector
-          try {
-            detector = new BarcodeDetector({ formats: ['qr_code'] })
-          } catch {
-            setState('unavailable')
-            return
-          }
-          detector.detect(canvas)
-            .then((codes) => {
-              if (!cancelled) setState(codes.length > 0 ? 'ok' : 'fail')
-            })
-            .catch(() => {
-              if (!cancelled) setState('fail')
-            })
-        }
-        image.onerror = () => {
-          if (!cancelled) setState('fail')
-        }
-        image.src = src
-        return () => {
-          cancelled = true
-        }
-      }, [src])
-      return state
-    }
-
     /** Shared status polling: the settings page and the task panel read one payload. */
     function useMysStatus(onData, initialStatus) {
       const [status, setStatus] = useState(initialStatus ?? null)
@@ -853,110 +826,215 @@ window.__ModuleLoader__.load({
       return { status, error, refresh }
     }
 
-    /** Shared QR login flow, used by both the settings section and the task panel. */
-    function useMysLogin({ t, refresh, onNotice }) {
-      const [qr, setQr] = useState(null)
-      const [busy, setBusy] = useState(false)
-      const refreshRef = useRef(refresh)
-      refreshRef.current = refresh
-      const noticeRef = useRef(onNotice)
-      noticeRef.current = onNotice
-
-      const startLogin = useCallback(async () => {
-        setBusy(true)
-        try {
-          const data = await callJson('login/start', {
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body: '{}',
-          })
-          setQr({ ticket: data.ticket, src: data.qr, state: 'pending' })
-        } catch (failure) {
-          noticeRef.current?.(fill(t('saveFailed'), { message: String(failure?.message ?? failure) }))
-        } finally {
-          setBusy(false)
+    /** Memory-only callbacks, shared by the account and community login CTAs. */
+    function createSmsController({ request, changed, confirmed, now = Date.now }) {
+      let state = null, generation = 0, revision = 0, locked = false
+      const publish = () => changed(state && { ...state })
+      const cancelId = (flowId) => { if (flowId) void request('login/cancel', { flowId }).catch(() => {}) }
+      const errorKey = (code) => ({ 'sms-code-invalid': 'smsWrongCode', 'sms-cooldown': 'smsCooldown', 'flow-expired': 'smsExpired', 'flow-changed': 'smsExpired', 'rate-limited': 'smsRateLimited', 'challenge-expired': 'smsExpired' })[code] ?? 'smsFailed'
+      const accept = (data) => {
+        if (data.state === 'confirmed' && data.ok === true) {
+          generation++; revision++; locked = false; state = null; publish(); confirmed(data); return
         }
-      }, [t])
-
-      useEffect(() => {
-        if (qr === null) return undefined
-        let stopped = false
-        let finished = false
-        let timer
-        const tick = async () => {
-          try {
-            const body = await requestJson(`login/poll?ticket=${encodeURIComponent(qr.ticket)}`)
-            if (stopped) return
-            if (body.state === 'expired') {
-              finished = true
-              setQr((current) => (current === null ? null : { ...current, state: 'expired' }))
-            } else if (body?.ok === false) {
-              finished = true
-              setQr((current) => (current === null ? null : { ...current, state: 'error', message: body.error?.message }))
-            } else if (body.state === 'confirmed') {
-              finished = true
-              setQr(null)
-              noticeRef.current?.(body.warning ? String(body.warning) : t('qrConfirmed'))
-              void refreshRef.current?.()
-            } else if (body.state === 'error') {
-              finished = true
-              setQr((current) => (current === null ? null : { ...current, state: 'error', message: body.error?.message }))
-            } else {
-              setQr((current) => (current === null ? null : { ...current, state: body.state }))
-            }
-          } catch (failure) {
-            if (!stopped) {
-              finished = true
-              setQr((current) => (current === null ? null : { ...current, state: 'error', message: String(failure?.message ?? failure) }))
-            }
-          } finally {
-            if (!stopped && !finished) timer = setTimeout(tick, 2200)
+        if (data.flow && state.flow && data.flow.flowId !== state.flow.flowId) {
+          state.challenge = null; state.error = 'smsExpired'; return
+        }
+        if (data.flow) state.flow = data.flow
+        state.challenge = data.challenge ?? (state.challenge?.challengeId === data.flow?.challenge?.challengeId ? state.challenge : null)
+        state.error = data.ok === false ? errorKey(data.error?.code) : null
+      }
+      const perform = async (path, payload) => {
+        if (!state || locked || state.fatal) return
+        locked = true; state.busy = true; state.error = null
+        const gen = generation
+        revision++; publish()
+        try {
+          if (path === 'login/send' && !state.flow) {
+            const start = await request('login/start', { phone: state.phone })
+            if (generation !== gen) { cancelId(start.flow?.flowId); return }
+            state.phone = ''
+            accept(start)
+            if (!start.ok || !state.flow) return
+            payload = { flowId: state.flow.flowId }
           }
-        }
-        timer = setTimeout(tick, 900)
-        return () => {
-          stopped = true
-          clearTimeout(timer)
-        }
-      }, [qr?.ticket])
-
-      const cancelLogin = useCallback(async () => {
-        setQr(null)
-        try {
-          await callJson('login/cancel', { method: 'POST', body: '{}' })
-        } catch {
-          /* the local dialog is closed either way */
-        }
-      }, [])
-
-      return { qr, busy, startLogin, cancelLogin }
+          const data = await request(path, payload)
+          if (generation !== gen) return
+          state.code = ''
+          accept(data)
+        } catch { if (generation === gen && state) { state.code = ''; state.error = 'smsFailed' } }
+        finally { if (generation === gen && state) { locked = false; state.busy = false; revision++; publish() } }
+      }
+      const cancel = () => {
+        const id = state?.flow?.flowId
+        generation++; revision++; locked = false; state = null; publish(); cancelId(id)
+      }
+      return {
+        open() { if (state) return; generation++; state = { phone: '', code: '', flow: null, challenge: null, busy: false, error: null }; publish() },
+        setPhone(value) { if (state && !locked && !state.flow) { state.phone = value; publish() } },
+        setCode(value) { if (state && !locked) { state.code = value; publish() } },
+        send() {
+          if (!state || locked) return
+          if (!state.flow && !/^1[3-9]\d{9}$/.test(state.phone)) { state.error = 'smsBadPhone'; publish(); return }
+          if (state.flow?.resendAt > now()) return
+          return perform('login/send', state.flow ? { flowId: state.flow.flowId } : undefined)
+        },
+        submit() {
+          if (!state || locked) return
+          if (!state.flow || !/^\d{6}$/.test(state.code)) { state.error = 'smsBadCode'; publish(); return }
+          return perform('login/submit', { flowId: state.flow.flowId, code: state.code })
+        },
+        solve(challengeId, result) {
+          if (!state || locked || !state.challenge || state.challenge.challengeId !== challengeId || state.challenge.expiresAt <= now()) return
+          state.challenge = null
+          return perform('login/challenge', { flowId: state.flow.flowId, challengeId, result })
+        },
+        widgetError() { if (state) { revision++; state.challenge = null; state.code = ''; state.error = 'smsWidgetFailed'; state.fatal = true; publish() } },
+        async readState() {
+          if (!state?.flow || locked || state.fatal) return
+          const id = state.flow.flowId, gen = generation, rev = revision
+          try {
+            const data = await request('login/state')
+            if (gen !== generation || rev !== revision || !state) return
+            if (!data.flow || data.flow.flowId !== id) { state.challenge = null; state.error = 'smsExpired'; state.flow = { ...state.flow, status: 'expired' } }
+            else {
+              state.flow = data.flow
+              if (state.challenge?.challengeId !== data.flow.challenge?.challengeId) state.challenge = null
+              if (data.flow.status === 'expired') state.error = 'smsExpired'
+            }
+            publish()
+          } catch { if (gen === generation && rev === revision && state) { state.error = 'smsFailed'; publish() } }
+        },
+        cancel, dispose: cancel,
+      }
     }
 
-    function QrDialog({ t, session, onRefresh, onClose, detector }) {
-      const state = session.state
-      const label = state === 'scanned' ? t('qrScanned')
-        : state === 'expired' ? t('qrExpired')
-        : state === 'confirmed' ? t('qrConfirmed')
-        : state === 'error' ? (session.message ?? t('qrExpired'))
-        : t('qrPending')
-      return h('div', {
-        className: 'mys-overlay',
-        role: 'dialog',
-        'aria-modal': 'true',
-        'aria-label': t('qrTitle'),
-        onClick: (event) => {
-          if (event.target === event.currentTarget) onClose()
+    function createCaptchaBridge({ getWindow, nonce, challenge, onResult, onError, onReady = () => {}, now = Date.now }) {
+      let done = false
+      const send = (data) => getWindow()?.postMessage({ ...data, nonce }, '*')
+      return {
+        load() {
+          if (done || now() >= challenge.expiresAt) { onError(); return }
+          const config = {}
+          for (const key of ['captchaId', 'challenge', 'newCaptcha', 'offline', 'riskType', 'userInfo', 'language']) {
+            if (Object.hasOwn(challenge.config, key)) config[key] = challenge.config[key]
+          }
+          send({ type: 'mys-captcha:init', version: challenge.version, config })
         },
-      }, h('div', { className: 'mys-dialog' },
-        h('h3', { className: 'mys-dialog-title' }, t('qrTitle')),
-        h('div', { className: 'mys-qr' }, h('img', { src: session.src, alt: t('qrTitle') })),
-        h('div', { className: 'mys-qr-state' }, label),
-        h('div', { className: 'mys-hint' }, t('qrHint')),
-        detector === 'ok' ? h('div', { className: 'mys-hint' }, t('detectorOk')) : null,
-        detector === 'fail' ? h('div', { className: 'mys-banner', 'data-tone': 'warn' }, t('detectorFail')) : null,
-        h('div', { className: 'mys-dialog-foot' },
-          state === 'expired' ? h(Button, { variant: 'primary', onClick: onRefresh }, t('qrRefresh')) : null,
-          h(Button, { onClick: onClose }, t('qrCancel')))))
+        receive(event) {
+          if (done || now() >= challenge.expiresAt || event.source !== getWindow()) return
+          const data = event.data
+          if (!data || data.nonce !== nonce) return
+          if (data.type === 'mys-captcha:ready') { onReady(); return }
+          if (data.type === 'mys-captcha:error') { done = true; onError(); return }
+          if (data.type !== 'mys-captcha:success') return
+          const fields = challenge.version === 'gt4' ? ['captcha_id', 'lot_number', 'pass_token', 'gen_time', 'captcha_output'] : ['geetest_challenge', 'geetest_validate', 'geetest_seccode']
+          const raw = data.result, result = {}
+          if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return
+          for (const field of fields) {
+            const value = raw[field]
+            if (typeof value !== 'string' || !/^[A-Za-z0-9_~+/.=|:-]{1,8192}$/.test(value)) return
+            result[field] = value
+          }
+          if (JSON.stringify(result).length > 12288) return
+          done = true; onResult(challenge.challengeId, result)
+        },
+        dispose() { done = true; send({ type: 'mys-captcha:destroy' }) },
+      }
+    }
+
+    function CaptchaFrame({ t, challenge, onResult, onError }) {
+      const frame = useRef(null), bridge = useRef(null)
+      const [html, setHtml] = useState(null)
+      const callbacks = useRef({ onResult, onError }); callbacks.current = { onResult, onError }
+      useEffect(() => {
+        let stopped = false, timeout
+        const current = createCaptchaBridge({ getWindow: () => frame.current?.contentWindow, nonce: crypto.randomUUID(), challenge,
+          onResult: (...args) => callbacks.current.onResult(...args), onReady: () => clearTimeout(timeout), onError: () => { clearTimeout(timeout); callbacks.current.onError() } })
+        bridge.current = current
+        window.addEventListener('message', current.receive)
+        // Fetch through the authenticated owner carrier. Desktop uses IPC fetch,
+        // so an iframe navigation to apiUrl() would not reach the Host there.
+        void (async () => {
+          try {
+            const response = await fetch(apiUrl('login/captcha-frame'), { credentials: 'include', cache: 'no-store' })
+            if (!response.ok || !response.headers.get('content-type')?.startsWith('text/html')) throw new Error()
+            const text = await response.text()
+            if (text.length > 32768) throw new Error()
+            if (!stopped) setHtml(text)
+          } catch { if (!stopped) callbacks.current.onError() }
+        })()
+        timeout = setTimeout(() => { if (!stopped) callbacks.current.onError() }, Math.min(30000, Math.max(0, challenge.expiresAt - Date.now())))
+        const expiry = setTimeout(() => { if (!stopped) callbacks.current.onError() }, Math.max(0, challenge.expiresAt - Date.now()))
+        return () => { stopped = true; clearTimeout(expiry); clearTimeout(timeout); current.dispose(); window.removeEventListener('message', current.receive); bridge.current = null }
+      }, [challenge.challengeId])
+      return html === null ? h('div', { role: 'status' }, t('smsWidgetLoading')) : h('iframe', {
+        ref: frame, title: t('smsVerification'), sandbox: 'allow-scripts', referrerPolicy: 'no-referrer', srcDoc: html,
+        className: 'mys-captcha-frame', onLoad: () => bridge.current?.load(), onError,
+      })
+    }
+
+    function useMysLogin({ t, refresh, onNotice }) {
+      const [session, setSession] = useState(null)
+      const refs = useRef({ refresh, onNotice, t }); refs.current = { refresh, onNotice, t }
+      const controller = useRef(null)
+      if (!controller.current) controller.current = createSmsController({
+        request: (path, body) => requestJson(path, body === undefined ? undefined : { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }),
+        changed: setSession,
+        confirmed: (data) => { refs.current.onNotice?.(refs.current.t(data.warning ? 'smsSuccessWarning' : 'smsSuccess')); void refs.current.refresh?.() },
+      })
+      useEffect(() => () => controller.current.dispose(), [])
+      useEffect(() => {
+        if (!session?.flow) return undefined
+        const timer = setInterval(() => { void controller.current.readState() }, 2000)
+        return () => clearInterval(timer)
+      }, [session?.flow?.flowId])
+      return { session, busy: session?.busy === true, controller: controller.current, startLogin: () => controller.current.open(), cancelLogin: () => controller.current.cancel() }
+    }
+
+    function SmsDialog({ t, session, controller }) {
+      const [now, setNow] = useState(Date.now)
+      const dialog = useRef(null)
+      const close = useRef(controller.cancel); close.current = controller.cancel
+      useEffect(() => {
+        const previous = document.activeElement
+        const root = dialog.current
+        root?.querySelector('input,button')?.focus()
+        const timer = setInterval(() => setNow(Date.now()), 1000)
+        return () => { clearInterval(timer); previous?.focus?.() }
+      }, [])
+      const flow = session.flow
+      const seconds = Math.max(0, Math.ceil(((flow?.resendAt ?? 0) - now) / 1000))
+      const terminal = session.fatal || (flow && (['error', 'expired', 'candidate-ready'].includes(flow.status) || flow.expiresAt <= now))
+      const disabled = session.busy || flow?.busy || terminal || !!session.challenge
+      const codeReady = flow?.status === 'code-sent'
+      const onSubmit = (event) => { event.preventDefault(); if (!disabled) void (codeReady ? controller.submit() : controller.send()) }
+      return h('div', { className: 'mys-overlay', role: 'presentation', onClick: event => { if (event.target === event.currentTarget) controller.cancel() } },
+        h('div', { className: 'mys-dialog', ref: dialog, role: 'dialog', 'aria-modal': true, 'aria-label': t('smsTitle'), 'aria-busy': session.busy,
+          onKeyDown: event => {
+            if (event.key === 'Escape') { event.preventDefault(); close.current(); return }
+            if (event.key !== 'Tab') return
+            const items = [...(dialog.current?.querySelectorAll('input:not(:disabled),button:not(:disabled):not([hidden]),iframe') ?? [])]
+            const first = items[0], last = items.at(-1)
+            if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus() }
+            else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus() }
+          } },
+          h('h3', { className: 'mys-dialog-title' }, t('smsTitle')),
+          h('div', { className: 'mys-hint' }, t('smsHint')),
+          h('form', { onSubmit },
+            h('label', { className: 'mys-field' }, t('smsPhone'), h('input', { className: 'mys-input', type: 'tel', inputMode: 'tel', autoComplete: 'tel-national', maxLength: 11,
+              value: flow ? flow.phoneMasked : session.phone, disabled: !!flow || session.busy, onChange: event => controller.setPhone(event.target.value) })),
+            flow ? h('label', { className: 'mys-field' }, t('smsCode'), h('input', { className: 'mys-input', type: 'text', inputMode: 'numeric', autoComplete: 'one-time-code', maxLength: 6, value: session.code,
+              disabled: !codeReady || disabled, onChange: event => controller.setCode(event.target.value) })) : null,
+            session.error ? h('div', { className: 'mys-banner', role: 'alert', 'data-tone': 'warn' }, t(session.error)) : null,
+            h('div', { role: 'status', 'aria-live': 'polite', className: 'mys-hint' }, session.busy ? t('smsBusy') : terminal ? t('smsExpired') : seconds > 0 ? fill(t('smsCountdown'), { seconds }) : codeReady ? t('smsCodeSent') : ''),
+            session.challenge ? h(CaptchaFrame, { key: session.challenge.challengeId, t, challenge: session.challenge, onResult: controller.solve, onError: controller.widgetError }) : null,
+            h('div', { className: 'mys-dialog-foot' },
+              h(Button, { type: 'button', variant: 'primary', disabled: !!disabled || (!codeReady && seconds > 0), onClick: () => { if (!disabled) void (codeReady ? controller.submit() : controller.send()) } }, t(codeReady ? 'smsSubmit' : 'smsSend')),
+              flow ? h(Button, { type: 'button', disabled: !!disabled || seconds > 0, onClick: () => { void controller.send() } }, t('smsResend')) : null,
+              h(Button, { type: 'button', onClick: controller.cancel }, t('smsCancel'))),
+            // Native form submission supports Enter without giving custom Button
+            // wrappers an implicit second submission path.
+            h('button', { type: 'submit', hidden: true, disabled: !!disabled, tabIndex: -1, 'aria-hidden': true }))))
     }
 
     const BADGE_DISMISS_KEY = 'dsh.mys-checkin.dismissed-at'
@@ -1034,7 +1112,6 @@ window.__ModuleLoader__.load({
         }
       }, __status)
       const loginFlow = useMysLogin({ t, refresh, onNotice: setNotice })
-      const detector = useDetector(loginFlow.qr?.src)
 
       useEffect(() => () => {
         if (saveTimerRef.current !== null) clearTimeout(saveTimerRef.current)
@@ -1259,7 +1336,7 @@ window.__ModuleLoader__.load({
                 ? h(Button, { onClick: refreshCredentials, disabled: busy.refresh }, busy.refresh ? t('refreshing') : t('refresh'))
                 : h(Button, { variant: 'primary', onClick: loginFlow.startLogin, disabled: loginFlow.busy },
                     loginFlow.busy
-                      ? t('qrChecking')
+                      ? t('smsBusy')
                       : login.state === 'active' ? t('upgradeLogin') : login.state === 'expired' ? t('relogin') : t('login')),
               login.state !== 'anonymous'
                 ? h(Button, { variant: 'danger', onClick: deleteLogin }, deleteArmed ? t('deleteConfirm') : t('deleteLogin'))
@@ -1510,15 +1587,6 @@ window.__ModuleLoader__.load({
                 value: Math.round((draft?.retry?.delayMs ?? 60000) / 1000),
                 onChange: (event) => patchDraft((next) => { next.retry.delayMs = Math.max(10, Number(event.target.value) || 60) * 1000; return next }),
               })),
-            h('label', { className: 'mys-field' }, t('qrAge'),
-              h('input', {
-                className: 'mys-input',
-                type: 'number',
-                min: 60,
-                max: 300,
-                value: Math.round((draft?.maxQrAgeMs ?? 180000) / 1000),
-                onChange: (event) => patchDraft((next) => { next.maxQrAgeMs = Math.max(60, Number(event.target.value) || 180) * 1000; return next }),
-              })),
             h('div', { className: 'mys-hint' }, t('appVersionDesc')))),
 
         h(Card, { title: t('logs') },
@@ -1535,13 +1603,7 @@ window.__ModuleLoader__.load({
         h(Card, { title: t('riskTitle') },
           h('div', { className: 'mys-hint' }, t('riskList'))),
 
-        loginFlow.qr === null ? null : h(QrDialog, {
-          t,
-          session: loginFlow.qr,
-          detector,
-          onRefresh: loginFlow.startLogin,
-          onClose: loginFlow.cancelLogin,
-        }))
+        loginFlow.session === null ? null : h(SmsDialog, { t, session: loginFlow.session, controller: loginFlow.controller }))
     }
 
     /** Sidebar rail icon for the task panel. */

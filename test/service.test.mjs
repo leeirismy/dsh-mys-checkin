@@ -121,6 +121,7 @@ test('service wiring: routes, login, status', async (t) => {
     '/api/mys/community/run',
     '/api/mys/config',
     '/api/mys/login/cancel',
+    '/api/mys/login/captcha-frame',
     '/api/mys/login/challenge',
     '/api/mys/login/send',
     '/api/mys/login/start',
