@@ -8,6 +8,7 @@ import { normalizeConfig } from '../lib/config.js'
 
 const request = (route = 'logout', body = {}) => new Request(`http://owner.invalid/api/mys/${route}`, { method: 'POST', body: JSON.stringify(body) })
 const reply = (body) => new Response(JSON.stringify(body), { status: 200 })
+const balancePath = '/apihub/wapi/getUserMissionsState'
 const deferred = () => { let resolve; const promise = new Promise((r) => { resolve = r }); return { promise, resolve } }
 function syntheticAuth(id = '123') {
   return { aid: id, stuid: id, mid: 'secret-mid', accountName: 'Synthetic account', cookies: { stuid: id, ltuid: id, ltoken: 'secret-ltoken', stoken: 'v2_secret-stoken', mid: 'secret-mid' } }
@@ -291,6 +292,134 @@ test('an old QR confirmation cannot win while a replacement QR is still being cr
     assert.equal(old.error?.code, 'session-changed')
     assert.equal(service.state.auth, null)
   } finally { queryRelease.resolve(); createRelease.resolve(); await replacing }
+})
+
+test('community run queries one account snapshot before and after writes, without attributing points', async (t) => {
+  const { service, calls } = setup(t)
+  service.runCommunity(); await finish(service)
+  assert.deepEqual(calls.map(({ pathname }) => pathname), [balancePath, '/apihub/app/api/signIn', '/apihub/app/api/signIn', balancePath])
+})
+
+test('schedule can run community with all games off, consumes one actual attempt even on partial failure', async (t) => {
+  const { service, posts } = setup(t, ({ pathname, init }) => pathname === '/apihub/app/api/signIn' ? reply({ retcode: JSON.parse(init.body).gids === '5' ? 0 : -5003 }) : undefined)
+  service.config.enabled = true
+  assert.equal(service.run('schedule').started, true); await finish(service)
+  assert.equal(posts().length, 2)
+  assert.equal(service.state.runtime.community.lastResult.reason, 'schedule')
+  assert.equal(service.state.runtime.community.lastResult.ok, false)
+  assert.equal(service.state.runtime.scheduleLastAttemptDate, service.state.runtime.community.lastResult.day)
+  assert.equal(service.state.runtime.lastResult, null)
+  assert.equal(service.run('schedule').started, false)
+  assert.equal(posts().length, 2)
+})
+
+test('busy schedule does not consume automatic opportunity; releasing the shared lock replans', async (t) => {
+  const entered = deferred(), release = deferred()
+  const { service } = setup(t, async ({ pathname }) => {
+    if (pathname === '/apihub/app/api/signIn') { entered.resolve(); await release.promise; return reply({ retcode: 0 }) }
+  })
+  service.config.enabled = true
+  service.config.games.genshin = true
+  service.runCommunity(); await entered.promise
+  const done = service.runPromise
+  try {
+    assert.equal(service.run('schedule').error.code, 'busy')
+    assert.equal(service.state.runtime.scheduleLastAttemptDate, null)
+  } finally { release.resolve(); await done }
+  assert.ok(service.scheduler.getPlan())
+  assert.equal(service.run('schedule').started, true); await finish(service)
+  assert.ok(service.state.runtime.scheduleLastAttemptDate)
+})
+
+test('anonymous automatic skip consumes an attempt while no targets schedules nothing', async (t) => {
+  const { service, calls } = setup(t)
+  service.config.enabled = true
+  service.store.setAuth(null)
+  assert.equal(service.run('schedule').started, false)
+  assert.ok(service.state.runtime.scheduleLastAttemptDate)
+  assert.equal(calls.length, 0)
+  service.config.community.enabled = false
+  service.scheduler.refresh()
+  assert.equal(service.scheduler.getPlan(), null)
+})
+
+for (const captcha of [false, true]) test(`combined run preserves independent scopes and applies global CAPTCHA stop=${captcha}`, async (t) => {
+  const { service, posts, calls } = setup(t, ({ pathname }) => pathname === '/event/luna/hk4e/sign' ? reply({ retcode: captcha ? 1034 : 999 }) : undefined)
+  service.config.enabled = true
+  service.config.games.genshin = true
+  if (captcha) service.config.games.starrail = true
+  service.run('schedule'); await finish(service)
+  assert.equal(service.state.runtime.lastResult.ok, false)
+  if (captcha) assert.equal(service.state.runtime.lastResult.results.find((item) => item.game === 'starrail').outcome, 'skipped')
+  assert.equal(service.state.runtime.community.lastResult.ok, !captcha)
+  assert.equal(posts().length, captcha ? 0 : 2)
+  if (captcha) {
+    assert.deepEqual(service.state.runtime.community.lastResult.results.map((item) => item.outcome), ['skipped', 'skipped'])
+    assert.equal(calls.some(({ pathname }) => pathname === '/apihub/app/api/signIn'), false)
+  }
+})
+
+for (const target of ['/binding/api/getUserGameRolesByCookie', '/event/luna/hk4e/info']) test(`a game read CAPTCHA at ${target} stops remaining game and community writes`, async (t) => {
+  const { service, posts, calls } = setup(t, ({ pathname }) => pathname === target ? reply({ retcode: 1034 }) : undefined)
+  service.config.enabled = true
+  service.config.games.genshin = true
+  service.config.games.starrail = true
+  service.config.retry.attempts = 1
+  service.run('schedule'); await finish(service)
+  assert.equal(calls.some(({ pathname }) => pathname.endsWith('/sign')), false)
+  assert.equal(posts().length, 0)
+  assert.equal(service.state.runtime.lastResult.results[0].outcome, 'captcha')
+  assert.equal(service.state.runtime.community.lastResult.results[0].outcome, 'skipped')
+})
+
+test('unexpected community orchestration failure cannot replace the successful game banner or leak the cause', async (t) => {
+  const { service } = setup(t)
+  service.config.enabled = true
+  service.config.games.genshin = true
+  service.executeCommunity = async () => { throw new Error('https://secret.invalid/?stoken=secret-stoken') }
+  service.run('schedule'); await finish(service)
+  assert.equal(service.state.runtime.lastResult.ok, true)
+  assert.equal(service.state.runtime.lastError, null)
+  assert.equal(service.state.runtime.community.lastError.code, 'unknown')
+  assert.doesNotMatch(JSON.stringify(service.statusPayload()), /secret-stoken|secret\.invalid/)
+})
+
+test('completed community history is not overwritten by an automatic game failure', async (t) => {
+  const { service, posts } = setup(t, ({ pathname }) => pathname === '/event/luna/hk4e/sign' ? reply({ retcode: 999 }) : undefined)
+  service.config.enabled = true
+  service.config.games.genshin = true
+  service.runCommunity(); await finish(service)
+  const historical = structuredClone(service.state.runtime.community)
+  assert.equal(service.run('schedule').started, true); await finish(service)
+  assert.deepEqual(service.state.runtime.community, historical)
+  assert.equal(service.state.runtime.lastResult.ok, false)
+  assert.equal(posts().length, 2)
+})
+
+test('a completed game scope is preserved when automatic opportunity is only needed for community', async (t) => {
+  const { service, calls } = setup(t)
+  service.config.enabled = true
+  service.config.games.genshin = true
+  service.run('manual'); await finish(service)
+  const historical = structuredClone(service.state.runtime.lastResult)
+  assert.equal(service.run('schedule').started, true); await finish(service)
+  assert.deepEqual(service.state.runtime.lastResult, historical)
+  assert.equal(service.state.runtime.community.lastResult.ok, true)
+  assert.equal(calls.filter(({ pathname }) => pathname === '/event/luna/hk4e/sign').length, 1)
+})
+
+test('community recalculates the Shanghai request day instead of persisting one run-wide day across midnight', async (t) => {
+  const originalNow = Date.now
+  let clock = new Date('2026-11-18T15:59:59Z').getTime()
+  Date.now = () => clock
+  t.after(() => { Date.now = originalNow })
+  const { service } = setup(t, ({ pathname }) => {
+    if (pathname === '/apihub/app/api/signIn') { clock = new Date('2026-11-18T16:00:01Z').getTime(); return reply({ retcode: 0 }) }
+  })
+  service.runCommunity(); await finish(service)
+  assert.equal(service.state.runtime.community.signedDays['5'].day, '2026-11-18')
+  assert.equal(service.state.runtime.community.signedDays['2'].day, '2026-11-19')
+  assert.equal(service.state.runtime.community.balance.day, '2026-11-19')
 })
 
 test('a late profile response cannot repopulate an anonymous account', async (t) => {
