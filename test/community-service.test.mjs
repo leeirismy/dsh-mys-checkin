@@ -72,6 +72,15 @@ test('manual community route runs with all games off, preserves other scopes, ca
   assert.deepEqual(posts().map(({ init }) => JSON.parse(init.body).gids), ['5', '2', '6'])
 })
 
+test('partial community config updates preserve saved selection and independent protocol overrides, including explicit empty gids', async (t) => {
+  const { service } = setup(t)
+  service.config.community = { enabled: true, gids: ['6'], client: { appVersion: '9.8.7', salt: 'synthetic-salt' } }
+  await service.routeConfig(request('config', { community: { enabled: false } }))
+  assert.deepEqual(service.config.community, { enabled: false, gids: ['6'], client: { appVersion: '9.8.7', salt: 'synthetic-salt' } })
+  await service.routeConfig(request('config', { community: { gids: [], client: { salt: 'new-synthetic-salt' } } }))
+  assert.deepEqual(service.config.community, { enabled: false, gids: [], client: { appVersion: '9.8.7', salt: 'new-synthetic-salt' } })
+})
+
 test('partial failure and ambiguous writes stay distinct; account mission 58 does not skip gids', async (t) => {
   const { service, posts } = setup(t, ({ pathname, init }) => {
     if (pathname === '/apihub/app/api/signIn' && JSON.parse(init.body).gids === '2') return reply({ retcode: -5003, message: 'already signed' })

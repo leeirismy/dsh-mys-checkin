@@ -27,6 +27,7 @@ window.__ModuleLoader__.load({
     const NS = 'mys-checkin'
 
     const CSS = `
+.mys-community-options{border:0;padding:0;margin:0;min-width:0}
 .mys-section{max-width:820px;color:var(--dsw-alias-label-primary);display:flex;flex-direction:column;gap:14px}
 .mys-head{display:flex;flex-direction:column;gap:4px}
 .mys-title{margin:0;font-size:18px;font-weight:600;line-height:26px}
@@ -147,17 +148,49 @@ window.__ModuleLoader__.load({
 `
 
     const zh = {
+      communityTitle: "社区签到 · 米游币",
+      communityDesc: "默认关闭。启用后随现有定时窗口运行；仅签到，不看帖、点赞或分享。",
+      communityEnabled: "启用社区签到",
+      communitySelection: "签到分区",
+      communityRun: "立即社区签到",
+      communityOff: "社区签到已关闭",
+      communityEmpty: "请选择至少一个签到分区",
+      communityNoToken: "社区凭据不完整，请重新使用 App 扫码获取 SToken；不影响游戏登录。",
+      communityMissingMid: "V2 社区凭据缺少必要信息，请重新使用 App 扫码；不影响游戏登录。",
+      communityPending: "设置尚未保存生效，请稍候。",
+      communityPartial: "本轮社区签到有未完成分区",
+      communityAccepted: "接口已接受全部分区签到；积分到账未独立验证。",
+      communityNoResult: "尚无社区签到记录",
+      communityRisk: "需要人工验证：请在米游社 App 手动处理后再决定是否重试。",
+      communityUnknown: "结果不明：请先在米游社 App 核对，不要盲目重复请求。",
+      communityBalanceFail: "积分查询失败；不代表分区签到失败。",
+      communityHistorical: "历史积分快照",
+      communityCurrent: "今日查询快照",
+      communityBalance: "米游币余额",
+      communityReceived: "快照当日已获取",
+      communityRemaining: "快照当日剩余",
+      communitySnapshotAt: "查询时间",
+      communityNoBalance: "尚无积分查询快照",
+      communityOutcomeSuccess: "接口已接受",
+      communityOutcomeCached: "本机已记录今日接口接受",
+      communityOutcomeCaptcha: "待人工验证",
+      communityOutcomeUnknown: "结果不明",
+      communityOutcomeAuth: "社区凭据不可用",
+      communityOutcomeExpired: "社区凭据已失效，请重新 App 扫码",
+      communityOutcomeError: "失败",
+      communityOutcomeSkipped: "未执行",
+      outcomeSkipped: "未执行",
       nav: '米游社',
       title: '米游社签到',
-      intro: '每天在你设定的时间窗口内随机挑一个时刻，为已绑定的米哈游游戏自动签到。登录凭据只保存在本机。',
+      intro: '游戏与主动启用的社区签到共用每日随机时间窗口；两个手动按钮各自独立。登录凭据只保存在本机。',
       account: '账号',
-      accountDesc: '使用米游社 App 扫码登录；App 通道会同时获取可自动续期的 SToken。',
+      accountDesc: '使用米游社 App 扫码获取 SToken；可用它派生游戏凭据，不会更新 SToken 本身。',
       login: '扫码登录',
       relogin: '重新扫码',
       refresh: '续期凭据',
       refreshing: '续期中…',
       noStoken: '当前凭据不含 SToken，无法自动续期。',
-      noStokenHint: '重新扫码会走 App 通道，获取可自动续期的 SToken。',
+      noStokenHint: '重新扫码会走 App 通道获取 SToken；SToken 自身失效时仍须重新扫码。',
       upgradeLogin: '重新扫码获取 SToken',
       deleteLogin: '删除登录',
       deleteConfirm: '再次点击确认删除',
@@ -198,7 +231,7 @@ window.__ModuleLoader__.load({
       bound: '已绑定',
       actions: '手动操作',
       actionsDesc: '签到结果会显示在下方，并写入运行日志。',
-      runNow: '立即签到',
+      runNow: '立即游戏签到',
       running: '签到中…',
       verify: '检测接口与登录',
       verifying: '检测中…',
@@ -270,7 +303,7 @@ window.__ModuleLoader__.load({
       taskFrequency: '运行频率',
       taskRandom: '（窗口内随机）',
       taskNextRun: '下次运行',
-      taskLastRun: '上次运行',
+      taskLastRun: '最近游戏签到',
       taskPause: '暂停',
       taskResume: '启用',
       taskRunHistory: '运行记录',
@@ -300,11 +333,43 @@ window.__ModuleLoader__.load({
     }
 
     const en = {
+      communityTitle: "Community check-in · Coins",
+      communityDesc: "Off by default. Uses the existing schedule; check-in only, without reading, liking or sharing posts.",
+      communityEnabled: "Enable community check-in",
+      communitySelection: "Communities",
+      communityRun: "Check in to communities",
+      communityOff: "Community check-in is off",
+      communityEmpty: "Select at least one community",
+      communityNoToken: "Community credentials are incomplete. Scan again in the App to obtain SToken; game login is unaffected.",
+      communityMissingMid: "Required V2 community credentials are missing. Scan again in the App; game login is unaffected.",
+      communityPending: "Settings are not saved yet. Please wait.",
+      communityPartial: "Some communities remain incomplete",
+      communityAccepted: "All community requests were accepted; coin credit has not been independently verified.",
+      communityNoResult: "No community check-in record yet",
+      communityRisk: "Manual verification is required. Complete it in the Miyoushe App before deciding whether to retry.",
+      communityUnknown: "Unknown result. Check in the Miyoushe App before retrying; do not blindly resend.",
+      communityBalanceFail: "Coin query failed; community check-in may still have succeeded.",
+      communityHistorical: "Historical coin snapshot",
+      communityCurrent: "Snapshot queried today",
+      communityBalance: "Coin balance",
+      communityReceived: "Received on snapshot day",
+      communityRemaining: "Remaining on snapshot day",
+      communitySnapshotAt: "Queried at",
+      communityNoBalance: "No coin snapshot yet",
+      communityOutcomeSuccess: "Request accepted",
+      communityOutcomeCached: "Acceptance recorded locally today",
+      communityOutcomeCaptcha: "Manual verification required",
+      communityOutcomeUnknown: "Unknown result",
+      communityOutcomeAuth: "Community credentials unavailable",
+      communityOutcomeExpired: "Community credentials expired; scan again in the App",
+      communityOutcomeError: "Failed",
+      communityOutcomeSkipped: "Not executed",
+      outcomeSkipped: "Not executed",
       nav: 'miHoYo',
       title: 'miHoYo check-in',
-      intro: 'Signs in to your bound miHoYo games once a day at a random moment inside your windows. Credentials stay on this machine.',
+      intro: 'Games and opt-in community check-in share a randomized daily schedule. Each manual button runs only its own scope. Credentials stay local.',
       account: 'Account',
-      accountDesc: 'Scan the QR code with the miHoYo app; the app channel also fetches a renewable SToken.',
+      accountDesc: 'Scan with the App to obtain SToken and derive game credentials; this does not renew SToken itself.',
       login: 'Scan to sign in',
       relogin: 'Scan again',
       refresh: 'Refresh credentials',
@@ -351,7 +416,7 @@ window.__ModuleLoader__.load({
       bound: 'Bound',
       actions: 'Manual actions',
       actionsDesc: 'Results appear below and in the run log.',
-      runNow: 'Check in now',
+      runNow: 'Check in to games',
       running: 'Checking in…',
       verify: 'Test connection and session',
       verifying: 'Testing…',
@@ -423,7 +488,7 @@ window.__ModuleLoader__.load({
       taskFrequency: 'Schedule',
       taskRandom: ' (random inside the window)',
       taskNextRun: 'Next run',
-      taskLastRun: 'Last run',
+      taskLastRun: 'Last game check-in',
       taskPause: 'Pause',
       taskResume: 'Resume',
       taskRunHistory: 'Run history',
@@ -471,6 +536,7 @@ window.__ModuleLoader__.load({
       expired: 'outcomeExpired',
       'not-bound': 'outcomeNotBound',
       'first-bind': 'outcomeFirstBind',
+      skipped: 'outcomeSkipped',
       error: 'outcomeError',
     }
 
@@ -634,6 +700,65 @@ window.__ModuleLoader__.load({
             desc ? h('div', { className: 'mys-card-desc' }, desc) : null),
           null) : null,
         children)
+    }
+
+    // Pure element construction, independent from Host protocol modules.
+    function CommunityCard({ t, config, status, patchDraft, onRun, onLogin, loginBusy, busy }) {
+      const community = status?.community ?? {}
+      const selected = config?.community?.gids ?? []
+      const enabled = config?.community?.enabled === true
+      const capability = community.capability ?? { available: false }
+      const pending = config !== null && (enabled !== community.enabled || JSON.stringify(config?.community) !== JSON.stringify(status?.config?.community))
+      const disabled = config === null || !enabled || selected.length === 0 || !capability.available || busy || status?.running === true || pending
+      const results = community.lastResult?.results ?? []
+      const outcomes = {
+        success: 'communityOutcomeSuccess', 'cached-success': 'communityOutcomeCached', captcha: 'communityOutcomeCaptcha',
+        unknown: 'communityOutcomeUnknown', 'auth-unavailable': 'communityOutcomeAuth', expired: 'communityOutcomeExpired',
+        error: 'communityOutcomeError', skipped: 'communityOutcomeSkipped',
+      }
+      const parts = new Intl.DateTimeFormat('en', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date())
+      const part = (type) => parts.find((item) => item.type === type)?.value
+      const today = [part('year'), part('month'), part('day')].join('-')
+      const balance = community.balance
+      const current = balance?.day === today && !community.balanceError
+      const number = (value) => typeof value === 'number' && Number.isFinite(value) ? String(value) : '—'
+      return h(Card, { title: t('communityTitle'), desc: t('communityDesc') },
+        h('div', { className: 'mys-row' },
+          h('span', { className: 'mys-row-label' }, t('communityEnabled')),
+          h(Switch, { checked: enabled, label: t('communityEnabled'), disabled: config === null,
+            onChange: (value) => patchDraft((next) => { next.community.enabled = value; return next }) })),
+        h('fieldset', { className: 'mys-community-options', disabled: config === null },
+          h('legend', { className: 'mys-meta' }, t('communitySelection')),
+          (community.communities ?? []).map((item) => h('label', { className: 'mys-row', key: item.id },
+            h('input', { type: 'checkbox', 'aria-label': item.label, checked: selected.includes(item.id),
+              onChange: (event) => patchDraft((next) => {
+                const gids = next.community.gids.filter((gid) => gid !== item.id)
+                next.community.gids = event.target.checked ? [...gids, item.id] : gids
+                return next
+              }) }), h('span', null, item.label)))),
+        !enabled ? h('div', { className: 'mys-hint' }, t('communityOff')) : null,
+        enabled && selected.length === 0 ? h('div', { role: 'status', className: 'mys-hint' }, t('communityEmpty')) : null,
+        !capability.available ? h('div', { className: 'mys-hint' },
+          t(capability.reason === 'missing-mid' ? 'communityMissingMid' : 'communityNoToken'),
+          h(Button, { size: 'sm', onClick: onLogin, disabled: loginBusy }, t('relogin'))) : null,
+        pending ? h('div', { role: 'status', className: 'mys-hint' }, t('communityPending')) : null,
+        h('div', { className: 'mys-actions' }, h(Button, { 'data-action': 'community-run', disabled, onClick: onRun }, busy || community.running ? t('running') : t('communityRun'))),
+        community.lastError ? h('div', { className: 'mys-banner', 'data-tone': 'warn', role: 'status' }, community.lastError.message) : null,
+        h('div', { role: 'status', className: 'mys-meta' }, community.lastResult
+          ? t(community.lastResult.ok ? 'communityAccepted' : 'communityPartial') : t('communityNoResult')),
+        community.lastResult ? h('div', { className: 'mys-meta' }, formatTime(community.lastResult.at)) : null,
+        results.map((item, index) => h('div', { className: 'mys-row', key: item.gid + '-' + index },
+          h('div', { className: 'mys-row-label' },
+            h('div', null, item.label ?? item.gid), h('div', { className: 'mys-row-desc' }, item.message)),
+          h('span', { className: 'mys-tag', 'data-tone': ['success', 'cached-success'].includes(item.outcome) ? 'ok' : 'warn' }, t(outcomes[item.outcome] ?? 'communityOutcomeError')))),
+        results.some((item) => item.outcome === 'captcha') ? h('div', { className: 'mys-hint' }, t('communityRisk')) : null,
+        results.some((item) => item.outcome === 'unknown') ? h('div', { className: 'mys-hint' }, t('communityUnknown')) : null,
+        community.balanceError ? h('div', { role: 'status', className: 'mys-hint' }, t('communityBalanceFail'), ' ', community.balanceError.message) : null,
+        balance ? h('div', { className: 'mys-meta' },
+          h('div', null, t(current ? 'communityCurrent' : 'communityHistorical'), ' · ', balance.day ?? '—'),
+          h('div', null, t('communityBalance'), '：', number(balance.totalPoints)),
+          h('div', null, t('communityReceived'), '：', number(balance.todayReceived), ' · ', t('communityRemaining'), '：', number(balance.todayRemaining)),
+          h('div', null, t('communitySnapshotAt'), '：', formatTime(balance.at))) : h('div', { className: 'mys-meta' }, t('communityNoBalance')))
     }
 
     function StatusDot({ state }) {
@@ -894,7 +1019,7 @@ window.__ModuleLoader__.load({
     function Section({ t, __status }) {
       const [notice, setNotice] = useState(null)
       const [draft, setDraft] = useState(null)
-      const [busy, setBusy] = useState({ run: false, verify: false, refresh: false })
+      const [busy, setBusy] = useState({ run: false, community: false, verify: false, refresh: false })
       const [verifyInfo, setVerifyInfo] = useState(null)
       const [deleteArmed, setDeleteArmed] = useState(false)
       const dirtyRef = useRef(false)
@@ -985,6 +1110,18 @@ window.__ModuleLoader__.load({
           setNotice(fill(t('saveFailed'), { message: String(failure?.message ?? failure) }))
         } finally {
           setBusy((current) => ({ ...current, run: false }))
+        }
+      }, [refresh, t])
+
+      const runCommunityNow = useCallback(async () => {
+        setBusy((current) => ({ ...current, community: true }))
+        try {
+          await callJson('community/run', { method: 'POST', body: '{}' })
+          void refresh()
+        } catch (failure) {
+          setNotice(fill(t('saveFailed'), { message: String(failure?.message ?? failure) }))
+        } finally {
+          setBusy((current) => ({ ...current, community: false }))
         }
       }, [refresh, t])
 
@@ -1239,6 +1376,8 @@ window.__ModuleLoader__.load({
 
           h('div', { className: 'mys-meta' },
             `${t('nextRun')}：${targetText === null ? t('noPlan') : `${targetText}（${t(reasonKey)}）`}`)),
+
+        h(CommunityCard, { t, config, status, patchDraft, onRun: runCommunityNow, onLogin: loginFlow.startLogin, loginBusy: loginFlow.busy, busy: busy.community || busy.run }),
 
         h(Card, { title: t('games'), desc: t('gamesDesc') },
           h('div', { className: 'mys-list' },
