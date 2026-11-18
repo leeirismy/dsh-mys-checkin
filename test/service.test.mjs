@@ -165,6 +165,7 @@ test('service wiring: routes, login, status', async (t) => {
   t.after(() => service.dispose())
 
   assert.deepEqual([...ctx.routes.keys()].sort(), [
+    '/api/mys/community/run',
     '/api/mys/config',
     '/api/mys/login/cancel',
     '/api/mys/login/poll',
