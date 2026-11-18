@@ -121,7 +121,7 @@ test('normalizeConfig clamps numeric ranges', () => {
   assert.ok(config.gapMs.max >= config.gapMs.min)
   assert.equal(config.retry.attempts, 3)
   assert.equal(config.retry.delayMs, 10000)
-  assert.equal(config.maxQrAgeMs, 60000)
+  assert.equal(Object.hasOwn(config, 'maxQrAgeMs'), false)
 })
 
 test('normalizeConfig keeps unknown game ids off', () => {

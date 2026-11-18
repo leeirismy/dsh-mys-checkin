@@ -6,7 +6,7 @@ import test from 'node:test'
 import { MysService } from '../lib/service.js'
 import { normalizeConfig } from '../lib/config.js'
 
-const request = (route = 'logout', body = {}) => new Request(`http://owner.invalid/api/mys/${route}`, { method: 'POST', body: JSON.stringify(body) })
+const request = (route = 'logout', body = {}) => new Request(`http://owner.invalid/api/mys/${route}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
 const reply = (body) => new Response(JSON.stringify(body), { status: 200 })
 const balancePath = '/apihub/wapi/getUserMissionsState'
 const deferred = () => { let resolve; const promise = new Promise((r) => { resolve = r }); return { promise, resolve } }
@@ -245,28 +245,29 @@ test('game automatic refresh cannot resurrect old credentials or dispatch its se
   assert.equal(calls.filter(({ pathname }) => pathname === '/event/luna/hk4e/sign').length, 1)
 })
 
-function qrReply(call, id = '123') {
-  if (call.pathname.endsWith('/createQRLogin')) return reply({ retcode: 0, data: { ticket: 'synthetic-ticket', url: 'https://user.mihoyo.com/?ticket=synthetic-ticket' } })
-  if (call.pathname.endsWith('/queryQRLoginStatus')) {
-    const response = reply({ retcode: 0, data: { status: 'Confirmed', user_info: { aid: id, mid: 'secret-mid', nickname: 'Synthetic login' } } })
-    for (const cookie of [`ltuid_v2=${id}`, 'ltoken_v2=v2_secret-ltoken', 'stoken_v2=v2_secret-stoken', 'ltmid_v2=secret-mid', 'cookie_token_v2=v2_secret-cookie']) response.headers.append('set-cookie', `${cookie}; Path=/`)
-    return response
-  }
+function smsReply(call, id = '123') {
+  if (call.pathname.endsWith('/createLoginCaptcha')) return reply({ retcode: 0, data: { action_type: 'login', countdown: 60 } })
+  if (call.pathname.endsWith('/loginByMobileCaptcha')) return reply({ retcode: 0, data: { token: { token_type: 1, token: 'v2_secret-stoken' }, user_info: { aid: id, mid: 'secret-mid' } } })
+  if (call.pathname.endsWith('/getLTokenBySToken')) return reply({ retcode: 0, data: { ltoken: 'v2_secret-ltoken' } })
+  if (call.pathname.endsWith('/getCookieAccountInfoBySToken')) return reply({ retcode: 0, data: { uid: id, cookie_token: 'v2_secret-cookie' } })
   if (call.pathname === '/user/api/getUserFullInfo') return reply({ retcode: 0, data: { user: { user_info: { nickname: 'Synthetic login' } } } })
 }
-
-for (const id of ['123', '456']) test(`new QR login for ${id} invalidates old in-flight writes even on same-account login`, async (t) => {
+async function smsStart(service) {
+  const start = await service.routeLoginStart(request('login/start', { phone: '13800138000' }))
+  const flowId = start.flow.flowId
+  assert.equal((await service.routeLoginSend(request('login/send', { flowId }))).ok, true)
+  return flowId
+}
+for (const id of ['123', '456']) test(`new SMS login for ${id} invalidates old in-flight writes even on same-account login`, async (t) => {
   const entered = deferred(), release = deferred()
   const { service, posts } = setup(t, async (call) => {
     if (call.pathname === '/apihub/app/api/signIn') { entered.resolve(); await release.promise; return reply({ retcode: 0 }) }
-    return qrReply(call, id)
+    return smsReply(call, id)
   })
   service.runCommunity(); await entered.promise
-  const done = service.runPromise
-  const generation = service.authGeneration
+  const done = service.runPromise, generation = service.authGeneration
   try {
-    const start = await service.routeLoginStart(request('login/start'))
-    const confirmation = await service.routeLoginPoll(new Request(`http://owner.invalid/api/mys/login/poll?ticket=${start.ticket}`))
+    const confirmation = await service.routeLoginSubmit(request('login/submit', { flowId: await smsStart(service), code: '123456' }))
     assert.equal(confirmation.state, 'confirmed')
     assert.ok(service.authGeneration > generation)
   } finally { release.resolve() }
@@ -277,30 +278,28 @@ for (const id of ['123', '456']) test(`new QR login for ${id} invalidates old in
   assert.equal(posts().length, 1)
 })
 
-test('an old QR confirmation cannot win while a replacement QR is still being created', async (t) => {
-  const queried = deferred(), queryRelease = deferred(), creating = deferred(), createRelease = deferred()
-  let creates = 0
+test('old SMS confirmation cannot win while a new start request body is still being read', async (t) => {
+  const queried = deferred(), queryRelease = deferred(), bodyEntered = deferred(), bodyRelease = deferred()
   const { service } = setup(t, async (call) => {
-    if (call.pathname.endsWith('/createQRLogin')) {
-      if (++creates === 2) { creating.resolve(); await createRelease.promise }
-      return qrReply(call)
-    }
-    if (call.pathname.endsWith('/queryQRLoginStatus')) { queried.resolve(); await queryRelease.promise; return qrReply(call) }
-    return qrReply(call)
+    if (call.pathname.endsWith('/loginByMobileCaptcha')) { queried.resolve(); await queryRelease.promise }
+    return smsReply(call)
   })
   service.store.setAuth(null)
-  const start = await service.routeLoginStart(request('login/start'))
-  const polling = service.routeLoginPoll(new Request(`http://owner.invalid/api/mys/login/poll?ticket=${start.ticket}`))
+  const flowId = await smsStart(service)
+  const confirming = service.routeLoginSubmit(request('login/submit', { flowId, code: '123456' }))
   await queried.promise
-  service.login.createdAt -= 31_000
-  const replacing = service.routeLoginStart(request('login/start'))
-  await creating.promise
+  const replacing = service.routeLoginStart(new Request('http://owner.invalid/api/mys/login/start', {
+    method: 'POST', headers: { 'content-type': 'application/json' }, duplex: 'half',
+    body: new ReadableStream({ async start(controller) { bodyEntered.resolve(); await bodyRelease.promise; controller.enqueue(new TextEncoder().encode(JSON.stringify({ phone: '13900139000' }))); controller.close() } }),
+  }))
+  await bodyEntered.promise
+  // Once the authorized new start has entered, its old confirmation must lose.
   try {
     queryRelease.resolve()
-    const old = await polling
-    assert.equal(old.error?.code, 'session-changed')
+    const old = await confirming
+    assert.equal(old.ok, false)
     assert.equal(service.state.auth, null)
-  } finally { queryRelease.resolve(); createRelease.resolve(); await replacing }
+  } finally { queryRelease.resolve(); bodyRelease.resolve(); await replacing }
 })
 
 test('community run queries one account snapshot before and after writes, without attributing points', async (t) => {
