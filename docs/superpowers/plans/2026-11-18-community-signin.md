@@ -135,8 +135,10 @@
 - [x] Run `"$NODE" test/client-community.test.mjs` 观察 FAIL；若 VM 无法模拟完整面板，只抽取闭包内纯渲染函数测试，不把复杂手写 React 运行时变成新项目。
 - [x] 实现独立卡片、可访问 label/开关/忙态与状态说明；复用现有 fallback 原生控件/主题，不扩大 primitives 导入。README 写清开关、分区、SToken能力、验证码手动处理、单实例、线上未验证与重载边界。
 - [x] CI 加入五个新测试文件；跑所有九组测试及 `"$NODE" --check client.js`、`git diff --check`，预期 0 failures/exit0。完成 verification-before-completion 后才宣称离线测试通过。
-- [ ] 按 requesting-code-review 请求一次独立全分支审阅，重点参考 Review Focus；修复关键问题并复测；阶段提交 `feat: expose community sign-in controls and offline coverage`。
-- [ ] 检查最终 diff 与工作树，不自动 push/merge/重启；用 finishing-a-development-branch 给出将隔离改动整合回本地链接源码的选择。经用户选定整合后再次离线回归；GUI/真实账号未验收必须明确说明。
+- [x] 按 requesting-code-review 请求一次独立全分支审阅，重点参考 Review Focus；修复关键问题并复测；阶段提交 `feat: expose community sign-in controls and offline coverage`。审阅覆盖 fdd51d1..b6498d7，Important 派生凭据 CAPTCHA 丢失与 Minor 本地跨范围忙态均已加回归修复；最终修复未再请求第二轮独立审阅。
+- [x] 检查最终 diff 与工作树，不自动 push/merge/重启；用 finishing-a-development-branch 给出将隔离改动整合回本地链接源码的选择。GUI/真实账号未验收必须明确说明。
+
+后续门槛：由用户选择是否整合；仅在获得授权并整合后，再对整合结果运行离线回归。该后续整合与 GUI/真实账号验收不计作本分支已完成的验证。
 
 ## Self-review
 

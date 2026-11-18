@@ -1182,7 +1182,7 @@ window.__ModuleLoader__.load({
           h('div', null, t('bannerRun')),
           h('div', { className: 'mys-hint' }, String(lastError.message ?? '')),
           h('div', { className: 'mys-banner-actions' },
-            h(Button, { onClick: runNow, disabled: busy.run || status?.running }, t('retryRun'))))
+            h(Button, { onClick: runNow, disabled: busy.run || busy.community || status?.running }, t('retryRun'))))
       })()
 
       const login = status?.login ?? { state: 'anonymous' }
@@ -1208,9 +1208,9 @@ window.__ModuleLoader__.load({
           h('div', { className: 'mys-actions' },
             h(Button, {
               variant: 'primary',
-              disabled: busy.run || status?.running === true || login.state === 'anonymous',
+              disabled: busy.run || busy.community || status?.running === true || login.state === 'anonymous',
               onClick: runNow,
-            }, status?.running === true || busy.run ? t('running') : t('runNow')),
+            }, status?.running === true || busy.run || busy.community ? t('running') : t('runNow')),
             h(Button, {
               disabled: config === null,
               onClick: () => patchDraft((next) => { next.enabled = !enabled; return next }),

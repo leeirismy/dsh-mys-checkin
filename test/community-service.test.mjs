@@ -368,6 +368,42 @@ for (const captcha of [false, true]) test(`combined run preserves independent sc
   }
 })
 
+for (const target of ['getCookieAccountInfoBySToken', 'getLTokenBySToken']) for (const retcode of [1034, -999]) {
+  test(`game refresh CAPTCHA ${retcode} at ${target} stops remaining exchanges and all later writes`, async (t) => {
+    const { service, posts, calls } = setup(t, ({ pathname }) => {
+      if (pathname === '/event/luna/hk4e/sign') return reply({ retcode: -100 })
+      if (pathname.endsWith(target)) return reply({ retcode, message: 'secret-stoken https://secret.invalid' })
+      if (pathname.endsWith('getCookieAccountInfoBySToken')) return reply({ retcode: 0, data: { cookie_token: 'synthetic-derived-token' } })
+      if (pathname.endsWith('getLTokenBySToken')) return reply({ retcode: 0, data: { ltoken: 'synthetic-derived-ltoken' } })
+    })
+    service.config.enabled = true
+    service.config.games.genshin = true
+    service.config.games.starrail = true
+    const originalAuth = structuredClone(service.state.auth)
+    service.run('schedule'); await finish(service)
+    assert.equal(service.state.runtime.lastResult.results[0].outcome, 'captcha')
+    assert.equal(service.state.runtime.lastError.code, 'CAPTCHA')
+    assert.equal(service.state.runtime.lastResult.results[1].outcome, 'skipped')
+    assert.equal(posts().length, 0)
+    assert.equal(calls.filter(({ pathname }) => pathname.endsWith('/sign')).length, 1)
+    assert.equal(calls.filter(({ pathname }) => pathname.startsWith('/account/auth/')).length, target === 'getCookieAccountInfoBySToken' ? 1 : 2)
+    assert.equal(calls.some(({ pathname }) => pathname === balancePath), false)
+    assert.deepEqual(service.state.runtime.community.lastResult.results.map((item) => item.outcome), ['skipped', 'skipped'])
+    assert.deepEqual(service.state.auth, originalAuth)
+    assert.doesNotMatch(JSON.stringify(service.statusPayload()), /secret-stoken|secret\.invalid/)
+  })
+}
+
+test('manual refresh CAPTCHA preserves auth and reports verification rather than expired SToken', async (t) => {
+  const { service, calls } = setup(t, ({ pathname }) => pathname.endsWith('getCookieAccountInfoBySToken') ? reply({ retcode: 1034 }) : undefined)
+  const originalAuth = structuredClone(service.state.auth)
+  const result = await service.routeRefresh(request('refresh'))
+  assert.equal(result.error?.code, 'captcha')
+  assert.equal(service.state.runtime.lastError.code, 'CAPTCHA')
+  assert.deepEqual(service.state.auth, originalAuth)
+  assert.equal(calls.length, 1)
+})
+
 for (const target of ['/binding/api/getUserGameRolesByCookie', '/event/luna/hk4e/info']) test(`a game read CAPTCHA at ${target} stops remaining game and community writes`, async (t) => {
   const { service, posts, calls } = setup(t, ({ pathname }) => pathname === target ? reply({ retcode: 1034 }) : undefined)
   service.config.enabled = true

@@ -5,13 +5,17 @@ import test from 'node:test'
 
 // Unit-only element descriptions: no DOM, effects, timers, visual renderer or real fetch.
 const source = fs.readFileSync(new URL('../client.js', import.meta.url), 'utf8')
-function harness() {
+function harness({ communityBusy = false } = {}) {
   let plugin
   const slots = new Map(), requests = []
   let dictionaries
   const React = {
     createElement: (type, props, ...children) => ({ type, props: { ...props, children } }),
-    useState: (initial) => [typeof initial === 'function' ? initial() : initial, () => {}],
+    useState: (initial) => {
+      const value = typeof initial === 'function' ? initial() : initial
+      // Seed only the local request-state snapshot; no React lifecycle simulation.
+      return [value && typeof value === 'object' && 'community' in value && 'run' in value ? { ...value, community: communityBusy } : value, () => {}]
+    },
     useEffect: () => {}, useRef: (current) => ({ current }),
     useCallback: (fn) => fn, useMemo: (fn) => fn(),
   }
@@ -110,6 +114,22 @@ test('community-panel-states: partial, CAPTCHA, unknown and balance failure stay
   assert.match(content, /历史.*快照/)
   assert.match(content, /1234/)
   assert.doesNotMatch(content, /本次赚取|每日上限|今日余额/)
+})
+
+test('local community submission disables both game launch buttons before host running catches up', () => {
+  for (const communityBusy of [false, true, false]) {
+    const h = harness({ communityBusy }), status = fixture()
+    status.lastError = { code: 'RUN_FAILED', message: 'synthetic previous failure' }
+    const tree = h.Section({ t: h.t, __status: status })
+    const buttons = nodes(tree).filter((node) => node.type?.name === 'Button')
+    const launch = buttons.find((node) => [h.t('runNow'), h.t('running')].includes(text(node)))
+    const retry = buttons.find((node) => text(node) === h.t('retryRun'))
+    assert.ok(launch); assert.ok(retry)
+    assert.equal(launch.props.disabled, communityBusy)
+    assert.equal(retry.props.disabled, communityBusy)
+    assert.equal(text(launch), h.t(communityBusy ? 'running' : 'runNow'))
+    assert.equal(runButton(card(h, status)).props.disabled, communityBusy)
+  }
 })
 
 test('community-button-routing: community uses its own route while original game action stays unchanged', async () => {
