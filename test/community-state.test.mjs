@@ -58,6 +58,7 @@ test('v2 community results and balance survive close/reload without reviving old
     accountId: '123', lastRunAt: at, lastError: null,
     lastResult: { at, finishedAt: at + 1, reason: 'manual', day: '2026-11-18', gids: ['5'], ok: true,
       results: [{ gid: '5', label: '大别野', day: '2026-11-18', at, outcome: 'success', message: '已签到', retcode: 0 }] },
+    uncertainAttempt: null,
     balance: { totalPoints: 123, todayReceived: 30, todayRemaining: 60, at, day: '2026-11-18' },
     balanceError: { code: 'query-failed', message: '查询失败' },
     signedDays: { 5: { day: '2026-11-18', at } },
@@ -122,4 +123,33 @@ test('malformed saved community state cannot supply unsupported targets or raw r
   assert.equal(community.balance.todayRemaining, 4)
   assert.equal(JSON.stringify(community).includes('secret'), false)
   store.close()
+})
+
+test('migration reserves only account-bound, dated Dabieye unknown outcomes', () => {
+  const day = '2026-11-19', at = Date.parse('2026-11-18T20:00:00Z')
+  for (const [accountId, item, expected] of [
+    ['123', { gid: '5', outcome: 'unknown', day, at }, { gid: '5', day, at }],
+    ['123', { gid: '2', outcome: 'unknown', day, at }, null],
+    ['123', { gid: '5', outcome: 'unknown', day: '2026-11-18', at }, null],
+    ['123', { gid: '5', outcome: 'error', day, at }, null],
+    ['bad', { gid: '5', outcome: 'unknown', day, at }, null],
+  ]) {
+    const store = storeFor({ runtime: { community: { accountId, lastResult: { results: [item] } } } })
+    assert.deepEqual(store.get().runtime.community.uncertainAttempt, expected)
+    store.close()
+  }
+})
+
+test('standalone Dabieye diagnostic survives reload without erasing prior success', () => {
+  const day = '2026-11-19', at = Date.parse('2026-11-18T20:00:00Z')
+  const lastError = { gid: '5', code: 'unknown', message: 'Scoped diagnostic', at: at + 2 }
+  const signedDays = { 5: { day, at } }
+  const lastResult = { gids: ['5'], day, at, ok: true, results: [{ gid: '5', outcome: 'success', day, at }] }
+  for (const previous of [lastResult, undefined]) {
+    const store = storeFor({ runtime: { community: { accountId: '123', lastResult: previous, lastError, signedDays } } })
+    assert.deepEqual(store.get().runtime.community.lastError, lastError)
+    assert.deepEqual(store.get().runtime.community.signedDays, signedDays)
+    if (previous) assert.equal(store.get().runtime.community.lastResult.ok, true)
+    store.close()
+  }
 })

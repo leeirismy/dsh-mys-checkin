@@ -20,7 +20,8 @@ function syntheticAuth(id = '123') {
 function setup(t, handler = () => undefined) {
   const oldHome = process.env.DSH_HOME
   const original = globalThis.fetch
-  process.env.DSH_HOME = fs.mkdtempSync(path.join(os.tmpdir(), 'mys-community-service-'))
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'mys-community-service-'))
+  process.env.DSH_HOME = home
   const calls = [], unexpected = [], routes = new Map()
   globalThis.fetch = async (url, init) => {
     const call = { url, init, pathname: new URL(url).pathname }
@@ -35,11 +36,12 @@ function setup(t, handler = () => undefined) {
     unexpected.push(url)
     throw new Error('Unmatched fake request; real network is forbidden')
   }
-  const service = new MysService({
+  const mount = () => new MysService({
     logger: () => ({ info() {}, warn() {}, error() {} }),
     timeout: () => () => {},
     connection: { fetch: { register(route) { routes.set(route.path, route); return () => routes.delete(route.path) } } },
   })
+  const service = mount()
   service.config = normalizeConfig({ enabled: false, community: { enabled: true }, games: { genshin: false, starrail: false, zzz: false, honkai3: false, tears: false, bh2: false } })
   // No wall-clock waits in unit tests; normalization's public clamp has separate coverage.
   service.config.gapMs = { min: 0, max: 0 }
@@ -56,9 +58,9 @@ function setup(t, handler = () => undefined) {
   const checkin = async (body) => {
     const route = routes.get('/api/mys/run/checkin')
     assert.ok(route, 'unified check-in route must be registered')
-    return (await route.fetch(request('run/checkin', body))).json()
+    return (await route.fetch(request('run/checkin', body && typeof body === 'object' && !Array.isArray(body) ? { accountRevision: service.statusPayload().accountRevision, ...body } : body))).json()
   }
-  return { service, calls, routes, checkin, posts: () => calls.filter((call) => call.pathname === '/apihub/app/api/signIn') }
+  return { service, home, mount, calls, routes, checkin, posts: () => calls.filter((call) => call.pathname === '/apihub/app/api/signIn') }
 }
 async function finish(service) { const promise = service.runPromise; assert.ok(promise); await promise }
 
@@ -71,6 +73,7 @@ test('only unified POST accepts strict target snapshots and rejected requests ne
     { gameIds: [], dabieye: 'true' }, { gameIds: 'genshin', dabieye: true },
     { gameIds: [], dabieye: true, gids: ['2'] }, { gameIds: ['unknown'], dabieye: true },
     { gameIds: [5], dabieye: false }, { gameIds: ['genshin', 'genshin'], dabieye: true },
+    { gameIds: [], dabieye: true, accountRevision: '123' },
   ]) {
     const result = await checkin(body)
     assert.equal(result.error?.code, 'bad-request', JSON.stringify(body))
@@ -128,10 +131,10 @@ test('games-only manual snapshot compares as a set and preserves GAMES order wit
 test('partial community config updates preserve protocol overrides but reject any gid list', async (t) => {
   const { service } = setup(t)
   service.config.community = { enabled: true, client: { appVersion: '9.8.7', salt: 'synthetic-salt' } }
-  const rejected = await service.routeConfig(request('config', { community: { enabled: false, gids: [], client: { salt: 'ignored' } } }))
+  const rejected = await service.routeConfig(configWrite({ community: { enabled: false, gids: [], client: { salt: 'ignored' } } }, service.statusPayload().configRevision))
   assert.equal(rejected.error?.code, 'bad-request')
   assert.equal(service.config.community.enabled, true)
-  const updated = await service.routeConfig(request('config', { community: { enabled: false, client: { salt: 'new-synthetic-salt' } } }))
+  const updated = await service.routeConfig(configWrite({ community: { enabled: false, client: { salt: 'new-synthetic-salt' } } }, service.statusPayload().configRevision))
   assert.equal(updated.ok, true)
   assert.deepEqual(service.config.community, { enabled: false, client: { appVersion: '9.8.7', salt: 'new-synthetic-salt' } })
 })
@@ -231,7 +234,7 @@ test('closing community during balance preflight prevents the not-yet-sent write
   assert.equal((await checkin({ gameIds: [], dabieye: true })).started, true)
   await entered.promise
   try {
-    assert.equal((await service.routeConfig(request('config', { community: { enabled: false } }))).ok, true)
+    assert.equal((await service.routeConfig(configWrite({ community: { enabled: false } }, service.statusPayload().configRevision))).ok, true)
   } finally { release.resolve() }
   await finish(service)
   assert.deepEqual(calls.map(({ pathname }) => pathname), [balancePath])
@@ -406,12 +409,15 @@ test('community run queries one account snapshot before and after writes, withou
 
 test('schedule can run community with all games off, consumes one actual attempt even on failure', async (t) => {
   const { service, posts } = setup(t, ({ pathname }) => pathname === communitySignPath ? reply({ retcode: -5003 }) : undefined)
+  fixedClock(t, '2026-11-18T20:00:00Z')
   service.config.enabled = true
+  service.config.timezone = 'UTC'
   assert.equal(service.run('schedule').started, true); await finish(service)
   assert.equal(posts().length, 1)
   assert.equal(service.state.runtime.community.lastResult.reason, 'schedule')
   assert.equal(service.state.runtime.community.lastResult.ok, false)
-  assert.equal(service.state.runtime.scheduleLastAttemptDate, service.state.runtime.community.lastResult.day)
+  assert.equal(service.state.runtime.scheduleLastAttemptDate, '2026-11-18')
+  assert.equal(service.state.runtime.community.lastResult.day, '2026-11-19')
   assert.equal(service.state.runtime.lastResult, null)
   assert.equal(service.run('schedule').started, false)
   assert.equal(posts().length, 1)
@@ -587,4 +593,156 @@ test('a late profile response cannot repopulate an anonymous account', async (t)
   const profiling = service.enrichProfile(); await entered.promise
   await service.routeLogout(request()); release.resolve(); await profiling
   assert.equal(service.state.auth, null)
+})
+
+function fixedClock(t, value) {
+  const actual = Date.now
+  let clock = Date.parse(value)
+  Date.now = () => clock
+  t.after(() => { Date.now = actual })
+  return (value) => { clock = Date.parse(value) }
+}
+
+const configWrite = (config, configRevision) => request('config/checkin', { config, configRevision })
+
+test('a lost write survives reload and a failed manual retry; scheduled games still run, and next Shanghai day can write', async (t) => {
+  const clock = fixedClock(t, '2026-11-18T20:00:00Z')
+  let outcome = 'lost'
+  const { service, calls, posts, mount } = setup(t, ({ pathname }) => {
+    if (pathname !== communitySignPath) return
+    if (outcome === 'lost') throw new Error('synthetic response loss')
+    if (outcome === 'definite') return reply({ retcode: -5003 })
+  })
+  service.config.timezone = 'UTC'
+  service.config.enabled = true
+  service.run('manual'); await finish(service)
+  assert.equal(service.statusPayload().community.lastResult.results[0].outcome, 'unknown')
+  assert.equal(posts().length, 1)
+  outcome = 'definite'
+  service.run('manual'); await finish(service)
+  assert.equal(posts().length, 2)
+  service.config.games.genshin = true
+  service.dispose()
+  const restored = mount()
+  t.after(() => restored.dispose())
+  assert.equal(restored.run('schedule').started, true); await finish(restored)
+  assert.equal(calls.filter(({ pathname }) => pathname === gameSignPath).length, 1)
+  assert.equal(posts().length, 2, 'no automatic repeat after ambiguous dispatch and definite manual rejection')
+  assert.equal(restored.statusPayload().community.lastError.code, 'unknown')
+  assert.equal(restored.state.runtime.scheduleLastAttemptDate, '2026-11-18')
+  assert.deepEqual(restored.state.runtime.community.signedDays, {})
+  outcome = 'accepted'
+  clock('2026-11-19T20:00:00Z')
+  assert.equal(restored.run('schedule').started, true); await finish(restored)
+  assert.equal(posts().length, 3)
+  assert.equal(restored.statusPayload().community.lastResult.ok, true)
+  assert.equal(restored.statusPayload().community.uncertainAttempt, null)
+})
+
+test('community reservation is on disk when POST begins, and cannot block another account', async (t) => {
+  const entered = deferred(), release = deferred()
+  fixedClock(t, '2026-11-18T20:00:00Z')
+  const { service, home, posts } = setup(t, async ({ pathname }) => {
+    if (pathname === communitySignPath) { entered.resolve(); await release.promise; throw new Error('synthetic response loss') }
+  })
+  service.run('manual')
+  await entered.promise
+  try {
+    const raw = JSON.parse(fs.readFileSync(path.join(home, 'mys-checkin', 'state.json'), 'utf8'))
+    assert.equal(raw.runtime.community.accountId, '123')
+    assert.equal(raw.runtime.community.uncertainAttempt?.day, '2026-11-19')
+    assert.deepEqual(raw.runtime.community.signedDays, {})
+  } finally { release.resolve(); await finish(service) }
+  service.store.setAuth(syntheticAuth('456'))
+  service.config.enabled = true
+  assert.equal(service.run('schedule').started, true); await finish(service)
+  assert.equal(posts().length, 2)
+})
+
+// A directory at the temp-file path causes a real EISDIR without chmod/root dependence.
+function breakAtomicWrite(service) {
+  fs.mkdirSync(`${service.store.file}.${process.pid}.tmp`)
+}
+
+test('cannot dispatch a community write without a saved reservation', async (t) => {
+  const { service, posts } = setup(t)
+  breakAtomicWrite(service)
+  service.run('manual'); await finish(service)
+  assert.equal(posts().length, 0)
+  assert.equal(service.statusPayload().community.lastResult.ok, false)
+  assert.equal(service.statusPayload().community.lastError.code, 'save-failed')
+})
+
+test('failed atomic config save leaves persisted and effective config, schedule and revision off', async (t) => {
+  const { service, calls } = setup(t)
+  service.config.community.enabled = false
+  service.store.flush()
+  const previous = service.statusPayload()
+  const disk = fs.readFileSync(service.store.file, 'utf8')
+  breakAtomicWrite(service)
+  const answer = await service.routeConfig(configWrite({ enabled: true, community: { enabled: true } }, previous.configRevision))
+  assert.equal(answer.error?.code, 'save-failed')
+  const next = service.statusPayload()
+  assert.equal(next.configRevision, previous.configRevision)
+  assert.deepEqual(next.config, previous.config)
+  assert.deepEqual(next.schedule, previous.schedule)
+  assert.equal(fs.readFileSync(service.store.file, 'utf8'), disk)
+  assert.equal(service.run('schedule').started, false)
+  assert.equal((await service.routeCheckin(request('run/checkin', { gameIds: [], dabieye: true, accountRevision: next.accountRevision }))).started, false)
+  assert.deepEqual(calls, [])
+})
+
+test('config revision is a strict CAS on the new route; competing full draft cannot turn Dabieye back on', async (t) => {
+  const { service, routes, calls } = setup(t)
+  const before = service.statusPayload()
+  const a = { ...before.config, timezone: 'UTC' }
+  const b = { ...before.config, community: { ...before.config.community, enabled: false } }
+  const saved = await service.routeConfig(configWrite(b, before.configRevision))
+  assert.equal(saved.ok, true)
+  const stale = await service.routeConfig(configWrite(a, before.configRevision))
+  assert.equal(stale.error?.code, 'config-conflict')
+  assert.equal(routes.has('/api/mys/config'), false)
+  assert.deepEqual(routes.get('/api/mys/config/checkin')?.methods, ['POST'])
+  const after = service.statusPayload()
+  assert.equal(after.checkinProtocol, 1)
+  assert.notEqual(after.configRevision, before.configRevision)
+  assert.equal(after.config.community.enabled, false)
+  assert.equal(JSON.parse(fs.readFileSync(service.store.file, 'utf8')).config.community.enabled, false)
+  for (const body of [b, { config: b }, { config: [], configRevision: after.configRevision }, { config: b, configRevision: after.configRevision, extra: true }]) {
+    assert.equal((await service.routeConfig(request('config/checkin', body))).error?.code, 'bad-request')
+  }
+  assert.deepEqual(calls, [])
+})
+
+test('Host rejects an unseen same-target login replacement before dispatch', async (t) => {
+  const { service, calls } = setup(t, (call) => smsReply(call, '456'))
+  const first = service.statusPayload()
+  const sign = await service.routeLoginSubmit(request('login/submit', { flowId: await smsStart(service), code: '123456' }))
+  assert.equal(sign.state, 'confirmed')
+  const count = calls.length
+  const stale = await service.routeCheckin(request('run/checkin', { gameIds: [], dabieye: true, accountRevision: first.accountRevision }))
+  assert.equal(stale.error?.code, 'account-changed')
+  assert.equal(stale.started, false)
+  assert.equal(calls.length, count)
+  assert.notEqual(sign.status.accountRevision, first.accountRevision)
+  assert.match(sign.status.accountRevision, /^[0-9a-f-]{36}$/)
+  assert.equal((await service.routeCheckin(request('run/checkin', { gameIds: [], dabieye: true, accountRevision: sign.status.accountRevision }))).started, true)
+  await finish(service)
+})
+
+test('accepted manual retry resolves a same-day uncertainty and prevents another write', async (t) => {
+  fixedClock(t, '2026-11-18T20:00:00Z')
+  let lost = true
+  const { service, posts } = setup(t, ({ pathname }) => {
+    if (pathname === communitySignPath && lost) throw new Error('synthetic response loss')
+  })
+  service.run('manual'); await finish(service)
+  assert.equal(service.statusPayload().community.uncertainAttempt?.day, '2026-11-19')
+  lost = false
+  service.run('manual'); await finish(service)
+  assert.equal(service.statusPayload().community.uncertainAttempt, null)
+  assert.equal(service.statusPayload().community.lastResult.ok, true)
+  service.run('manual'); await finish(service)
+  assert.equal(posts().length, 2)
+  assert.equal(service.statusPayload().community.lastResult.results[0].outcome, 'cached-success')
 })

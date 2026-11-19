@@ -11,17 +11,6 @@ window.__ModuleLoader__.load({
     const h = React.createElement
     const { useState, useEffect, useRef, useCallback } = React
 
-    // DSH's own atoms: reusing them keeps every button and switch identical to
-    // the built-in settings pages instead of approximating their look.
-    let primitives = null
-    try {
-      primitives = require('@deepseek-ai/dsh-client-ui-primitives')
-    } catch {
-      primitives = null
-    }
-    const PrimitiveButton = typeof primitives?.Button === 'function' ? primitives.Button : null
-    const PrimitiveSwitch = typeof primitives?.Switch === 'function' ? primitives.Switch : null
-
     const PLUGIN_ID = '@local/dsh-mys-checkin'
     const NS = 'mys-checkin'
 
@@ -33,7 +22,7 @@ window.__ModuleLoader__.load({
 .mys-card{box-sizing:border-box;border:.5px solid var(--dsw-alias-border-l2);border-radius:10px;background:var(--dsw-alias-bg-layer-1,transparent);padding:14px 16px;display:flex;flex-direction:column;gap:12px}
 .mys-card-head{display:flex;align-items:flex-start;gap:12px}
 .mys-card-head-text{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
-.mys-card-title{font-size:14px;font-weight:600;line-height:22px}
+.mys-card-title{margin:0;font-size:14px;font-weight:600;line-height:22px}
 .mys-card-desc{font-size:12px;line-height:18px;color:var(--dsw-alias-label-tertiary)}
 .mys-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .mys-btn{box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;gap:6px;height:36px;padding:0 14px;font:inherit;font-size:14px;line-height:22px;border-radius:var(--dsw-radius-md,8px);cursor:pointer;white-space:nowrap;transition:background .12s ease,color .12s ease,border-color .12s ease}
@@ -49,26 +38,28 @@ window.__ModuleLoader__.load({
 .mys-danger-text{color:var(--dsw-alias-state-error-primary,#d93026)}
 .mys-account{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px;line-height:20px;flex:1;min-width:0}
 .mys-dot{width:8px;height:8px;border-radius:50%;flex:none;background:var(--dsw-alias-label-tertiary,#8a919e)}
-.mys-dot[data-state=active]{background:#22a06b}
-.mys-dot[data-state=expired]{background:#d93026}
+.mys-dot[data-state=active]{background:var(--dsw-alias-state-success-primary)}
+.mys-dot[data-state=expired]{background:var(--dsw-alias-state-error-primary)}
 .mys-meta{color:var(--dsw-alias-label-tertiary);font-size:12px}
 .mys-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .mys-row-label{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
 .mys-row-title{font-size:13px;line-height:20px}
 .mys-row-desc{font-size:12px;line-height:18px;color:var(--dsw-alias-label-tertiary)}
 .mys-row input[type=checkbox]{flex:none;width:15px;height:15px;margin:0;cursor:pointer;accent-color:var(--dsw-alias-button-primary-fill,#4d6bfe)}
-.mys-switch{position:relative;flex:none;box-sizing:border-box;width:36px;height:20px;padding:0;border:none;border-radius:999px;cursor:pointer;background:var(--dsw-alias-bg-layer-3,#d9dde3);transition:background .15s ease}
-.mys-switch[aria-checked=true]{background:var(--dsw-alias-brand-primary,#4d8dff)}
+.mys-switch{position:relative;flex:none;box-sizing:border-box;width:36px;height:20px;padding:0;border:none;border-radius:999px;cursor:pointer;background:var(--dsw-alias-border-selected);transition:background .15s ease}
+.mys-switch[aria-checked=true]{background:var(--dsw-alias-brand-primary)}
+.mys-switch:disabled{opacity:.5;cursor:default}
 .mys-switch:focus-visible{outline:2px solid var(--dsw-alias-brand-primary,#4d8dff);outline-offset:2px}
-.mys-knob{position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.3);transition:transform .15s ease}
+.mys-knob{position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:var(--dsw-alias-switch-thumb);transition:transform .15s ease}
 .mys-switch[aria-checked=true] .mys-knob{transform:translateX(16px)}
 .mys-window{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .mys-time{box-sizing:border-box;font:inherit;font-size:12px;height:28px;padding:0 8px;border-radius:6px;border:.5px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-1,transparent);color:var(--dsw-alias-label-primary)}
 .mys-time:focus-visible{outline:2px solid var(--dsw-focus-ring-color,var(--dsw-alias-brand-primary,#4d6bfe));outline-offset:1px}
 .mys-banner{box-sizing:border-box;border-radius:10px;padding:10px 12px;font-size:13px;line-height:20px;display:flex;flex-direction:column;gap:6px;border:.5px solid transparent}
-.mys-banner[data-tone=error]{background:rgba(217,48,38,.08);border-color:rgba(217,48,38,.35);color:var(--dsw-alias-state-error-primary,#a3231c)}
-.mys-banner[data-tone=warn]{background:rgba(214,148,0,.1);border-color:rgba(214,148,0,.35);color:var(--dsw-alias-state-warning-primary,#8a5b00)}
-.mys-banner[data-tone=ok]{background:rgba(34,160,107,.1);border-color:rgba(34,160,107,.3);color:#177a50}
+.mys-banner[hidden]{display:none}
+.mys-banner[data-tone=error]{background:color-mix(in srgb,var(--dsw-alias-state-error-primary) 8%,transparent);border-color:var(--dsw-alias-state-error-secondary);color:var(--dsw-alias-state-error-primary)}
+.mys-banner[data-tone=warn]{background:var(--dsw-alias-state-warn-tertiary);border-color:var(--dsw-alias-state-warn-secondary);color:var(--dsw-alias-state-warn-label)}
+.mys-banner[data-tone=ok]{background:var(--dsw-alias-state-success-tertiary);border-color:var(--dsw-alias-state-success-secondary);color:var(--dsw-alias-state-success-primary)}
 .mys-banner-actions{display:flex;gap:8px;flex-wrap:wrap}
 .mys-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
 .mys-field{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--dsw-alias-label-tertiary)}
@@ -78,14 +69,14 @@ window.__ModuleLoader__.load({
 .mys-table th{text-align:left;font-weight:500;color:var(--dsw-alias-label-tertiary);padding:4px 6px;border-bottom:.5px solid var(--dsw-alias-border-l2)}
 .mys-table td{padding:4px 6px;border-bottom:.5px solid var(--dsw-alias-border-l2)}
 .mys-tag{display:inline-block;font-size:11px;line-height:16px;padding:0 6px;border-radius:6px;background:var(--dsw-alias-bg-layer-3,#eceff3);color:var(--dsw-alias-label-secondary,#4b5563)}
-.mys-tag[data-tone=ok]{background:rgba(34,160,107,.15);color:#177a50}
-.mys-tag[data-tone=warn]{background:rgba(214,148,0,.15);color:#8a5b00}
-.mys-tag[data-tone=error]{background:rgba(217,48,38,.13);color:#a3231c}
-.mys-logs{max-height:200px;overflow:auto;display:flex;flex-direction:column;gap:4px;font-size:12px;line-height:18px;font-family:var(--dsw-font-mono,ui-monospace,SFMono-Regular,Menlo,monospace)}
+.mys-tag[data-tone=ok]{background:var(--dsw-alias-state-success-tertiary);color:var(--dsw-alias-state-success-primary)}
+.mys-tag[data-tone=warn]{background:var(--dsw-alias-state-warn-tertiary);color:var(--dsw-alias-state-warn-label)}
+.mys-tag[data-tone=error]{background:color-mix(in srgb,var(--dsw-alias-state-error-primary) 13%,transparent);color:var(--dsw-alias-state-error-primary)}
+.mys-logs{max-height:200px;overflow:auto;display:flex;flex-direction:column;gap:4px;font-size:12px;line-height:18px;font-family:var(--ds-font-family-code)}
 .mys-log{display:flex;gap:8px}
 .mys-log-time{color:var(--dsw-alias-label-tertiary);flex:none}
-.mys-log[data-level=warn] .mys-log-text{color:#8a5b00}
-.mys-log[data-level=error] .mys-log-text{color:#a3231c}
+.mys-log[data-level=warn] .mys-log-text{color:var(--dsw-alias-state-warn-label)}
+.mys-log[data-level=error] .mys-log-text{color:var(--dsw-alias-state-error-primary)}
 .mys-empty{font-size:12px;color:var(--dsw-alias-label-tertiary)}
 .mys-overlay{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;background:rgba(15,23,42,.45);padding:24px}
 .mys-captcha-frame{width:100%;height:420px;border:0;background:#fff;border-radius:8px}
@@ -117,14 +108,14 @@ window.__ModuleLoader__.load({
 .mys-account-name{font-size:14px;font-weight:500;line-height:20px}
 .mys-run{display:flex;flex-direction:column;gap:12px}
 .mys-summary{position:relative;display:flex;align-items:center;gap:14px;box-sizing:border-box;border:.5px solid var(--dsw-alias-border-l2);border-radius:var(--dsw-radius-xl,14px);padding:16px;background:linear-gradient(135deg,color-mix(in srgb,var(--dsw-alias-button-primary-fill,#4d6bfe) 12%,transparent),transparent 62%),var(--dsw-alias-bg-layer-1,transparent)}
-.mys-summary-mark{width:44px;height:44px;flex:none;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;color:#fff;background:var(--dsw-alias-button-primary-fill,#4d6bfe)}
+.mys-summary-mark{width:44px;height:44px;flex:none;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;color:var(--dsw-alias-state-success-primary);background:var(--dsw-alias-state-success-tertiary)}
+.mys-summary-mark[data-done=false]{color:var(--dsw-alias-state-warn-label);background:var(--dsw-alias-state-warn-tertiary)}
 .mys-summary-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
-.mys-summary-title{font-size:18px;font-weight:600;line-height:26px}
 .mys-summary-sub{font-size:12px;line-height:18px;color:var(--dsw-alias-label-secondary)}
 .mys-summary-score{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:4px;text-align:right}
 .mys-summary-count{font-size:30px;font-weight:700;line-height:1;color:var(--dsw-alias-button-primary-fill,#4d6bfe);font-variant-numeric:tabular-nums}
-.mys-summary-badge{font-size:11px;line-height:18px;padding:0 10px;border-radius:999px;background:rgba(34,160,107,.15);color:#177a50}
-.mys-summary-badge[data-done=false]{background:rgba(214,148,0,.16);color:#8a5b00}
+.mys-summary-badge{font-size:11px;line-height:18px;padding:0 10px;border-radius:999px;background:var(--dsw-alias-state-success-tertiary);color:var(--dsw-alias-state-success-primary)}
+.mys-summary-badge[data-done=false]{background:var(--dsw-alias-state-warn-tertiary);color:var(--dsw-alias-state-warn-label)}
 .mys-game{border:.5px solid var(--dsw-alias-border-l2);border-radius:var(--dsw-radius-lg,12px);overflow:hidden;background:var(--dsw-alias-bg-layer-1,transparent)}
 .mys-game-head{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:.5px solid var(--dsw-alias-border-l2);background:color-mix(in srgb,var(--mys-accent,#6b7280) 8%,transparent)}
 .mys-game-bar{width:4px;height:18px;border-radius:2px;flex:none;background:var(--mys-accent,#6b7280)}
@@ -134,11 +125,12 @@ window.__ModuleLoader__.load({
 .mys-game-table th{font-weight:400;color:var(--dsw-alias-label-tertiary);padding:6px 10px;border-bottom:.5px solid var(--dsw-alias-border-l2);text-align:center}
 .mys-game-table td{padding:8px 10px;text-align:center;font-variant-numeric:tabular-nums}
 .mys-status{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--dsw-alias-state-success-primary,#22a06b)}
-.mys-status[data-outcome=captcha],.mys-status[data-outcome=first-bind],.mys-status[data-outcome=not-bound]{color:var(--dsw-alias-state-warn-primary,#8a5b00)}
+.mys-status[data-outcome=captcha],.mys-status[data-outcome=first-bind],.mys-status[data-outcome=not-bound]{color:var(--dsw-alias-state-warn-label)}
 .mys-status[data-outcome=expired],.mys-status[data-outcome=error]{color:var(--dsw-alias-state-error-primary,#a3231c)}
-.mys-status[data-outcome=no-role]{color:var(--dsw-alias-label-tertiary)}
+.mys-status[data-outcome=no-role],.mys-status[data-outcome=skipped]{color:var(--dsw-alias-label-tertiary)}
 .mys-run-foot{text-align:center;font-size:12px;line-height:18px;color:var(--dsw-alias-label-tertiary);padding:2px 0 4px}
-.mys-badge{position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:55;display:flex;align-items:center;gap:8px;max-width:min(560px,calc(100vw - 32px));box-sizing:border-box;padding:6px 10px;border-radius:999px;font-size:12px;line-height:18px;background:#a3231c;color:#fff;box-shadow:0 8px 24px rgba(0,0,0,.28);pointer-events:auto}
+.mys-badge{position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:55;display:flex;align-items:center;gap:8px;max-width:min(560px,calc(100vw - 32px));box-sizing:border-box;padding:6px 10px;border-radius:999px;font-size:12px;line-height:18px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-state-error-primary);border:1px solid var(--dsw-alias-state-error-secondary);pointer-events:auto}
+.mys-badge[data-tone=warn]{color:var(--dsw-alias-state-warn-label);border-color:var(--dsw-alias-state-warn-secondary)}
 .mys-badge-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mys-badge-close{flex:none;border:none;background:transparent;color:inherit;font:inherit;cursor:pointer;opacity:.8;padding:0 2px}
 .mys-badge-close:hover{opacity:1}
@@ -175,10 +167,10 @@ window.__ModuleLoader__.load({
       smsWidgetFailed: "人工验证未完成或加载失败。请取消后重新登录；不会自动发送短信。",
       smsSuccess: "登录成功，凭据已完成只读校验。",
       smsSuccessWarning: "游戏凭据校验通过；社区只读校验未通过，请查看社区状态。",
-      communityTitle: "大别野签到 · 米游币",
+      communityTitle: "上次大别野签到",
       communityNoToken: "社区凭据不完整，请重新短信登录；不影响游戏登录。",
       communityMissingMid: "V2 社区凭据缺少必要信息，请重新短信登录；不影响游戏登录。",
-      communityPartial: "本轮大别野签到未完成",
+      communityPartial: "上次大别野签到未完成",
       communityAccepted: "接口已接受大别野签到；积分到账未独立验证。",
       communityNoResult: "尚无社区签到记录",
       communityRisk: "需要人工验证：请在米游社 App 手动处理后再决定是否重试。",
@@ -238,6 +230,14 @@ window.__ModuleLoader__.load({
       notQueried: '尚未读取角色',
       noRole: '无角色',
       bound: '已绑定',
+      incompatibleHost: '签到宿主端不兼容。请确认宿主与面板为同一版本，再重新加载页面。',
+      accountChanged: '登录账号或会话已变更。请核对当前账号，再次点击「立即签到」。未自动重试。',
+      saveConflict: '其他面板修改了设置，未保存的更改已放弃。请核对已保存设置，按需重新应用。',
+      saveFeedback: '签到设置保存状态',
+      useSaved: '使用已保存设置',
+      recordNote: '游戏与大别野分别记录，不一定来自同一轮签到。',
+      recordHistorical: '历史记录',
+      coinHeading: '账号米游币快照',
       projects: '签到项目',
       projectsDesc: '手动与定时签到使用相同的已保存项目。',
       dabieye: '大别野（米游币）',
@@ -260,7 +260,7 @@ window.__ModuleLoader__.load({
       colGame: '游戏',
       colResult: '结果',
       colDetail: '说明',
-      noResult: '今天还没有运行记录。',
+      noResult: '尚无游戏签到记录。',
       advanced: '高级设置',
       gap: '游戏间隔（秒）',
       gapMin: '最小',
@@ -274,17 +274,18 @@ window.__ModuleLoader__.load({
       logs: '运行日志',
       logsEmpty: '暂无日志。',
       saveOk: '已保存',
-      saveFail: '设置未保存。请调整设置后再等保存完成，或重新打开面板查看宿主端设置。',
+      saveFail: '未能确认设置已保存，未保存的编辑已放弃。请核对宿主设置，再重新应用或选择使用已保存设置。',
       saveFailed: '保存失败：{message}',
       loadFailed: '无法连接插件宿主端：{message}',
       hostMissing: '插件宿主端未加载。请重新加载页面；若仍无效，重启 DSH。',
       bannerExpired: '登录状态已失效，自动签到无法继续。',
-      bannerCaptcha: '米游社要求人机验证，今日已停止自动签到。',
+      bannerCaptcha: '签到因人工验证停止。请在米游社 App 手动完成验证，再决定是否重试。',
       bannerRun: '最近一次签到失败。',
       verifyOk: '接口可用，登录有效（{ms}ms）',
       verifyAnon: '尚未登录，无法检测登录状态。',
       verifyFail: '网络不可达：{message}',
       verifyInvalid: '接口可用，但登录无效：{message}',
+      verifyUnavailable: '未能确认接口或登录状态，请稍后再检测。',
       riskTitle: '降低被风控的建议',
       riskList: '1) 每天只签一次，不要频繁手动补签。2) 保持固定的 device_id：本插件首次运行后不再更改，请不要删除状态文件。3) 不要在同一台机器上用同一个 DSH 反复登录多个账号。4) 触发验证码时先在米游社 App 内手动完成，不要连续重试。5) 网络出口尽量稳定，避免频繁更换 IP 或代理。',
       outcomeSigned: '成功',
@@ -327,8 +328,8 @@ window.__ModuleLoader__.load({
       taskStateExpired: '登录已失效',
       taskResumed: '已启用自动签到',
       taskPaused: '已暂停自动签到',
-      runTitle: '米游社游戏签到',
-      runSigned: '今日共签到',
+      runTitle: '上次游戏签到',
+      runSigned: '该记录签到成功',
       runAccounts: '个账号',
       runAuto: '是否自动签到',
       runAt: '签到时间',
@@ -336,10 +337,10 @@ window.__ModuleLoader__.load({
       runPartial: '未完成',
       runAccountUnit: '个账号',
       colStatus: '签到状态',
-      colReward: '今日奖励',
+      colReward: '签到奖励',
       colTotal: '累计签到',
-      runFooterDone: '所有账号今日签到已全部完成，记得明天再来哦！',
-      runFooterPartial: '部分账号还没完成，请看上方状态。',
+      runFooterDone: '该游戏记录中的项目已完成。',
+      runFooterPartial: '该游戏记录并未全部完成，请查看各项目结果。',
       yes: '是',
       no: '否',
       outcomeFirstBind: '待手动签到',
@@ -376,7 +377,7 @@ window.__ModuleLoader__.load({
       smsWidgetFailed: "Verification was not completed or could not load. Cancel and sign in again. No SMS was sent automatically.",
       smsSuccess: "Signed in; read-only credential checks passed.",
       smsSuccessWarning: "Game credentials verified; the community check did not pass. See community status.",
-      communityTitle: "Dabieye check-in · Coins",
+      communityTitle: "Last Dabieye check-in",
       communityNoToken: "Community credentials are incomplete. Sign in again by SMS; game login is unaffected.",
       communityMissingMid: "Required V2 community credentials are missing. Sign in again by SMS; game login is unaffected.",
       communityPartial: "Dabieye check-in did not complete",
@@ -439,6 +440,14 @@ window.__ModuleLoader__.load({
       notQueried: 'Roles not read yet',
       noRole: 'No character',
       bound: 'Bound',
+      incompatibleHost: 'Incompatible check-in host. Make sure the panel and host are the same version, then reload the page.',
+      accountChanged: 'The account or session changed. Review the current account and click Check in now again. No retry was sent.',
+      saveConflict: 'Settings changed in another panel. Your unsaved edits were discarded. Review the saved settings and reapply your edits if needed.',
+      saveFeedback: 'Check-in settings save status',
+      useSaved: 'Use saved settings',
+      recordNote: 'Games and Dabieye are recorded independently and may not be from the same run.',
+      recordHistorical: 'Historical record',
+      coinHeading: 'Account coin snapshot',
       projects: 'Check-in targets',
       projectsDesc: 'Manual and scheduled check-ins use the same saved targets.',
       dabieye: 'Dabieye (coins)',
@@ -461,7 +470,7 @@ window.__ModuleLoader__.load({
       colGame: 'Game',
       colResult: 'Result',
       colDetail: 'Detail',
-      noResult: 'Nothing has run today yet.',
+      noResult: 'No game check-in record yet.',
       advanced: 'Advanced',
       gap: 'Gap between games (s)',
       gapMin: 'min',
@@ -475,17 +484,18 @@ window.__ModuleLoader__.load({
       logs: 'Run log',
       logsEmpty: 'No log entries yet.',
       saveOk: 'Saved',
-      saveFail: 'Settings were not saved. Edit again and wait for the save, or reopen the panel to see the host settings.',
+      saveFail: 'The save could not be confirmed. Your draft was discarded. Review the host settings and reapply your edits or use the saved settings.',
       saveFailed: 'Save failed: {message}',
       loadFailed: 'Cannot reach the plugin host: {message}',
       hostMissing: 'The plugin host is not loaded. Reload the page, and restart DSH if this persists.',
       bannerExpired: 'The session expired; automatic check-in cannot continue.',
-      bannerCaptcha: 'miHoYo asked for human verification; today\'s run stopped.',
+      bannerCaptcha: 'Check-in stopped for human verification. Complete it manually in the Miyoushe App before deciding whether to retry.',
       bannerRun: 'The last check-in failed.',
       verifyOk: 'API reachable, session valid ({ms}ms)',
       verifyAnon: 'Not signed in; nothing to verify.',
       verifyFail: 'Network unreachable: {message}',
       verifyInvalid: 'API reachable but the session is invalid: {message}',
+      verifyUnavailable: 'Could not confirm the connection or session. Check again later.',
       riskTitle: 'Lowering risk-control flags',
       riskList: '1) One run per day; avoid repeated manual retries. 2) Keep the device id stable: it never changes after first use, so do not delete the state file. 3) Do not sign several accounts in from the same device. 4) When a captcha appears, clear it in the miHoYo app instead of retrying. 5) Keep the network egress stable; avoid hopping IPs or proxies.',
       outcomeSigned: 'Signed',
@@ -528,8 +538,8 @@ window.__ModuleLoader__.load({
       taskStateExpired: 'Session expired',
       taskResumed: 'Automatic check-in resumed',
       taskPaused: 'Automatic check-in paused',
-      runTitle: 'miHoYo game check-in',
-      runSigned: 'Signed in today:',
+      runTitle: 'Last game check-in',
+      runSigned: 'Successful in this record:',
       runAccounts: 'accounts',
       runAuto: 'Automatic',
       runAt: 'At',
@@ -537,10 +547,10 @@ window.__ModuleLoader__.load({
       runPartial: 'Incomplete',
       runAccountUnit: ' accounts',
       colStatus: 'Status',
-      colReward: 'Today reward',
+      colReward: 'Reward',
       colTotal: 'Total days',
-      runFooterDone: 'All accounts are signed in for today — see you tomorrow!',
-      runFooterPartial: 'Some accounts are not finished; see the status above.',
+      runFooterDone: 'The targets in this game record were completed.',
+      runFooterPartial: 'This game record is incomplete. See the individual results.',
       yes: 'yes',
       no: 'no',
       outcomeFirstBind: 'Manual first sign-in',
@@ -667,37 +677,18 @@ window.__ModuleLoader__.load({
         .join('、')
     }
 
-    /**
-     * One action button.
-     *
-     * `variant` is the plugin's vocabulary (`primary` / `danger` / `outline`);
-     * it maps onto DSH's own variants, and the built-in Button renders it.
-     * Without the primitives module (older shell) the fallback keeps the same
-     * geometry so the row layout does not jump.
-     */
+    // Local semantic controls; DS styles are shared through theme tokens only.
     function Button({ variant = 'outline', size = 'md', className, children, ...rest }) {
       const mapped = variant === 'primary' ? 'primary' : variant === 'danger' ? 'ghost' : 'outline'
-      const extra = variant === 'danger' ? 'mys-danger-text' : undefined
-      const merged = [extra, className].filter(Boolean).join(' ')
-      if (PrimitiveButton !== null) {
-        return h(PrimitiveButton, {
-          variant: mapped,
-          size,
-          ...(merged === '' ? {} : { className: merged }),
-          ...rest,
-          children,
-        })
-      }
       return h('button', {
         type: 'button',
         ...rest,
-        className: ['mys-btn', `mys-btn-${mapped}`, size === 'sm' ? 'mys-btn-sm' : '', merged].filter(Boolean).join(' '),
+        className: ['mys-btn', `mys-btn-${mapped}`, size === 'sm' ? 'mys-btn-sm' : '', variant === 'danger' && 'mys-danger-text', className].filter(Boolean).join(' '),
         children,
       })
     }
 
-    /** Fallback switch, used only when the shell has no primitives module. */
-    function FallbackSwitch({ checked, onChange, label, disabled }) {
+    function Switch({ checked, onChange, label, disabled }) {
       return h('button', {
         type: 'button',
         role: 'switch',
@@ -705,30 +696,40 @@ window.__ModuleLoader__.load({
         'aria-label': label,
         disabled: disabled === true,
         className: 'mys-switch',
-        onClick: () => onChange(!checked),
+        onClick: () => { if (!disabled) onChange(!checked) },
       }, h('span', { className: 'mys-knob', 'aria-hidden': true }))
     }
 
-    function Switch(props) {
-      if (PrimitiveSwitch !== null) {
-        return h(PrimitiveSwitch, {
-          checked: props.checked === true,
-          label: props.label,
-          ...(props.disabled === true ? { disabled: true } : {}),
-          onChange: props.onChange,
-        })
-      }
-      return h(FallbackSwitch, props)
-    }
-
-    function Card({ title, desc, children }) {
-      return h('section', { className: 'mys-card' },
+    function Card({ title, desc, id, children }) {
+      return h('section', { className: 'mys-card', 'aria-labelledby': id && title ? `${id}-title` : undefined, 'aria-describedby': id && desc ? `${id}-desc` : undefined },
         (title || desc) ? h('div', { className: 'mys-card-head' },
           h('div', { className: 'mys-card-head-text' },
-            title ? h('div', { className: 'mys-card-title' }, title) : null,
-            desc ? h('div', { className: 'mys-card-desc' }, desc) : null),
-          null) : null,
+            title ? h(id ? 'h2' : 'div', { className: 'mys-card-title', id: id ? `${id}-title` : undefined }, title) : null,
+            desc ? h('div', { className: 'mys-card-desc', id: id ? `${id}-desc` : undefined }, desc) : null)) : null,
         children)
+    }
+
+    const COMMUNITY_ZONE = 'Asia/Shanghai'
+    const gameCaptcha = (code) => code === 'CAPTCHA' || code === 'CAPTCHA_REQUIRED'
+
+    function scopeTime(at, zone, includeTime = false) {
+      if (!Number.isFinite(at) || !Number.isFinite(new Date(at).getTime())) return null
+      const parts = new Intl.DateTimeFormat('en-GB', {
+        timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit',
+        ...(includeTime && { hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }),
+      }).formatToParts(new Date(at))
+      const pick = (type) => parts.find((part) => part.type === type)?.value
+      const day = [pick('year'), pick('month'), pick('day')].join('-')
+      return includeTime ? `${day} ${[pick('hour'), pick('minute'), pick('second')].join(':')}` : day
+    }
+
+    function recordTime(record, zone, day, t) {
+      // Compare the record's own business day, never infer shared run membership.
+      try {
+        const when = scopeTime(record.at, zone, true)
+        const historical = (day ?? when?.slice(0, 10)) < scopeTime(Date.now(), zone)
+        return `${when ?? day ?? '—'} (${zone})${historical ? ` · ${t('recordHistorical')}` : ''}`
+      } catch { return formatTime(record.at) }
     }
 
     function CommunityResults({ t, community = {} }) {
@@ -738,49 +739,63 @@ window.__ModuleLoader__.load({
         unknown: 'communityOutcomeUnknown', 'auth-unavailable': 'communityOutcomeAuth', expired: 'communityOutcomeExpired',
         error: 'communityOutcomeError', skipped: 'communityOutcomeSkipped',
       }
-      const parts = new Intl.DateTimeFormat('en', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date())
-      const part = (type) => parts.find((item) => item.type === type)?.value
-      const today = [part('year'), part('month'), part('day')].join('-')
-      const balance = community.balance
-      const current = balance?.day === today && !community.balanceError
-      const number = (value) => typeof value === 'number' && Number.isFinite(value) ? String(value) : '—'
-      return h(Card, { title: t('communityTitle') },
-        community.lastError ? h('div', { className: 'mys-banner', 'data-tone': 'warn', role: 'status' }, community.lastError.message) : null,
+      return h(Card, { title: t('communityTitle'), id: 'mys-community-record' },
         h('div', { role: 'status', className: 'mys-meta' }, community.lastResult
           ? t(community.lastResult.ok ? 'communityAccepted' : 'communityPartial') : t('communityNoResult')),
-        community.lastResult ? h('div', { className: 'mys-meta' }, formatTime(community.lastResult.at)) : null,
+        community.lastResult ? h('div', { className: 'mys-meta' }, recordTime(community.lastResult, COMMUNITY_ZONE, community.lastResult.day, t)) : null,
         results.map((item, index) => h('div', { className: 'mys-row', key: item.gid + '-' + index },
           h('div', { className: 'mys-row-label' },
             h('div', null, item.label ?? item.gid), h('div', { className: 'mys-row-desc' }, item.message)),
-          h('span', { className: 'mys-tag', 'data-tone': ['success', 'cached-success'].includes(item.outcome) ? 'ok' : 'warn' }, t(outcomes[item.outcome] ?? 'communityOutcomeError')))),
-        results.some((item) => item.outcome === 'captcha') ? h('div', { className: 'mys-hint' }, t('communityRisk')) : null,
-        results.some((item) => item.outcome === 'unknown') ? h('div', { className: 'mys-hint' }, t('communityUnknown')) : null,
-        community.balanceError ? h('div', { role: 'status', className: 'mys-hint' }, t('communityBalanceFail'), ' ', community.balanceError.message) : null,
+          h('span', { className: 'mys-tag', 'data-tone': ['success', 'cached-success'].includes(item.outcome) ? 'ok' : item.outcome === 'skipped' ? '' : 'warn' }, t(outcomes[item.outcome] ?? 'communityOutcomeError')))),
+        community.lastError?.code === 'captcha' || results.some((item) => item.outcome === 'captcha')
+          ? h('div', { className: 'mys-banner', 'data-tone': 'warn', role: 'status' }, t('communityRisk')) : null,
+        community.uncertainAttempt || community.lastError?.code === 'unknown' || results.some((item) => item.outcome === 'unknown')
+          ? h('div', { className: 'mys-banner', 'data-tone': 'warn', role: 'status' }, t('communityUnknown')) : null,
+        community.lastError && !['captcha', 'unknown'].includes(community.lastError.code)
+          ? h('div', { className: 'mys-hint', role: 'status' }, community.lastError.message) : null)
+    }
+
+    function CoinSnapshot({ t, balance, balanceError }) {
+      const current = balance?.day === scopeTime(Date.now(), COMMUNITY_ZONE) && !balanceError
+      const number = (value) => typeof value === 'number' && Number.isFinite(value) ? String(value) : '—'
+      return h('section', { className: 'mys-card', 'aria-labelledby': 'mys-coin-heading' },
+        h('h2', { id: 'mys-coin-heading' }, t('coinHeading')),
+        balanceError ? h('div', { role: 'status', className: 'mys-hint' }, t('communityBalanceFail'), ' ', balanceError.message) : null,
         balance ? h('div', { className: 'mys-meta' },
           h('div', null, t(current ? 'communityCurrent' : 'communityHistorical'), ' · ', balance.day ?? '—'),
           h('div', null, t('communityBalance'), '：', number(balance.totalPoints)),
           h('div', null, t('communityReceived'), '：', number(balance.todayReceived), ' · ', t('communityRemaining'), '：', number(balance.todayRemaining)),
-          h('div', null, t('communitySnapshotAt'), '：', formatTime(balance.at))) : h('div', { className: 'mys-meta' }, t('communityNoBalance')))
+          h('div', null, t('communitySnapshotAt'), '：', recordTime(balance, COMMUNITY_ZONE, balance.day, t))) : h('div', { className: 'mys-meta' }, t('communityNoBalance')))
     }
 
     function StatusDot({ state }) {
       return h('span', { className: 'mys-dot', 'data-state': state, 'aria-hidden': true })
     }
 
-    /** Debounce is outside the queue; an edit reserves its revision immediately. */
+    const validRevision = (value) => typeof value === 'string'
+      && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(value)
+    const compatible = (data) => data?.ok === true && data.checkinProtocol === 1
+      && validRevision(data.configRevision) && validRevision(data.accountRevision)
+      && data.config && typeof data.config === 'object' && !Array.isArray(data.config)
+
+    /** The base of a dirty draft moves only with this queue's own successful saves. */
     function createConfigSaveQueue({ save, changed, initial = null }) {
       let confirmed = initial
-      let revision = 0, pending = false, failed = false, queued = null, draining = null
+      let revision = 0, pending = false, failed = null, queued = null, draining = null
       const view = () => ({ pending, failed, confirmed })
       const markEdited = () => {
         revision++
         pending = true
-        failed = false
+        failed = null
         changed()
         return revision
       }
-      const observe = (config) => {
-        if (!pending && !failed) confirmed = config
+      const observe = (snapshot) => {
+        if (!pending) confirmed = snapshot
+      }
+      const acceptSaved = () => {
+        failed = null
+        changed()
       }
       const drain = async () => {
         while (queued !== null) {
@@ -788,15 +803,18 @@ window.__ModuleLoader__.load({
           queued = null
           if (job.revision !== revision) continue
           try {
-            const config = await save(job.next)
-            if (job.revision !== revision) continue
-            confirmed = config
-          } catch {
-            if (job.revision !== revision) continue
-            failed = true
+            confirmed = await save(job.next, confirmed?.configRevision)
+            if (job.revision === revision) pending = false
+            changed()
+          } catch (failure) {
+            // Neither the failed full draft nor newer snapshots derived from it
+            // may be replayed after observing another panel's settings.
+            revision++
+            queued = null
+            pending = false
+            failed = failure?.code === 'config-conflict' ? 'saveConflict' : 'saveFail'
+            await changed()
           }
-          pending = false
-          changed()
         }
         draining = null
       }
@@ -806,34 +824,40 @@ window.__ModuleLoader__.load({
         draining ??= Promise.resolve().then(drain)
         return draining
       }
-      return { markEdited, submit, observe, view }
+      return { markEdited, submit, observe, acceptSaved, view }
     }
 
     function postJson(path, body) {
       return callJson(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
     }
 
-    // Own the status/selection used by both the rendered guard and the click
-    // callback. The callback checks the live snapshot even before React rerenders.
+    // Own the status/selection used by both rendering and the click callback.
     function createCheckinPanel({ initialStatus = null, changed }) {
-      let status = initialStatus, draft = status?.config ?? null, error = null
+      let status = initialStatus, draft = compatible(status) ? status.config : null, error = null
       let running = false, runIssue = null, needsRefresh = false, readVersion = 0, timer = null
+      const canEdit = () => compatible(status) && error === null && !needsRefresh && draft !== null
       const saves = createConfigSaveQueue({
-        initial: draft,
-        async save(config) {
-          const data = await postJson('config', { config })
-          if (!data?.config) throw new Error('Missing saved config')
-          // A poll begun before this acknowledgment cannot supersede it, even
-          // if it finishes when there is no pending edit left to protect it.
+        initial: compatible(status) ? status : null,
+        async save(config, configRevision) {
+          if (!canEdit()) throw new Error('Host unavailable')
+          const data = await postJson('config/checkin', { config, configRevision })
+          if (data?.ok !== true || !compatible(data.status) || data.status.configRevision === configRevision) throw new Error('Invalid check-in configuration response')
+          // Invalidate any older status read still in flight.
           readVersion++
-          return data.config
+          status = data.status
+          error = null
+          return data.status
         },
         changed() {
           const { pending, failed, confirmed } = saves.view()
-          if (!pending && !failed) {
-            draft = confirmed
-            void refresh()
+          if (failed) {
+            clearTimeout(timer)
+            draft = null
+            needsRefresh = true
+            changed()
+            return refresh()
           }
+          if (!pending) draft = confirmed?.config ?? null
           changed()
         },
       })
@@ -842,13 +866,11 @@ window.__ModuleLoader__.load({
         try {
           const data = await callJson('status')
           if (version !== readVersion) return
-          if (!data?.config) throw new Error('Missing Host config')
           status = data
           error = null
           needsRefresh = false
-          saves.observe(data.config)
-          const { pending, failed, confirmed } = saves.view()
-          if (!pending && !failed) draft = confirmed
+          saves.observe(compatible(data) ? data : null)
+          if (!saves.view().pending) draft = compatible(data) ? data.config : null
         } catch (failure) {
           if (version !== readVersion) return
           error = String(failure?.message ?? failure)
@@ -856,7 +878,7 @@ window.__ModuleLoader__.load({
         changed()
       }
       function patchDraft(mutate) {
-        if (draft === null) return
+        if (!canEdit()) return
         draft = mutate(structuredClone(draft))
         const edited = saves.markEdited()
         const next = draft
@@ -869,27 +891,30 @@ window.__ModuleLoader__.load({
       function selection() {
         const { pending, failed, confirmed } = saves.view()
         const targets = {
-          gameIds: Object.entries(confirmed?.games ?? {}).filter(([, enabled]) => enabled === true).map(([id]) => id),
-          dabieye: confirmed?.community?.enabled === true,
+          gameIds: Object.entries(confirmed?.config.games ?? {}).filter(([, enabled]) => enabled === true).map(([id]) => id),
+          dabieye: confirmed?.config.community?.enabled === true,
+          accountRevision: confirmed?.accountRevision,
         }
         const blocked = error !== null ? 'runOffline'
-          : running || status?.running === true ? 'runBusy'
-            : pending ? 'saving'
-              : failed ? 'saveFail'
-                : confirmed === null || needsRefresh ? 'runLoading'
-                  : !targets.gameIds.length && !targets.dabieye ? 'noTargets'
-                    : !status?.login || status.login.state === 'anonymous' ? 'runLogin' : null
+          : status !== null && !compatible(status) ? 'incompatibleHost'
+            : running || status?.running === true ? 'runBusy'
+              : pending ? 'saving'
+                : failed ? failed
+                  : confirmed === null || needsRefresh ? 'runLoading'
+                    : !targets.gameIds.length && !targets.dabieye ? 'noTargets'
+                      : !status?.login || status.login.state === 'anonymous' ? 'runLogin' : null
         return { targets, blocked }
       }
       async function runNow(renderedTargets) {
         const { targets, blocked } = selection()
         if (blocked !== null) return
-        // A status callback may have updated the controller before React has
-        // committed the new selection. Never send targets that button didn't show.
-        if (renderedTargets.dabieye !== targets.dabieye
+        // A poll can update the controller before React renders the new view.
+        // Both targets and account must be the ones the button displayed.
+        if (renderedTargets.accountRevision !== targets.accountRevision
+          || renderedTargets.dabieye !== targets.dabieye
           || renderedTargets.gameIds.length !== targets.gameIds.length
           || !renderedTargets.gameIds.every((id) => targets.gameIds.includes(id))) {
-          runIssue = 'staleTargets'
+          runIssue = renderedTargets.accountRevision !== targets.accountRevision ? 'accountChanged' : 'staleTargets'
           changed()
           return
         }
@@ -897,11 +922,12 @@ window.__ModuleLoader__.load({
         runIssue = null
         changed()
         try {
-          await postJson('run/checkin', targets)
+          const response = await postJson('run/checkin', targets)
+          if (response?.ok !== true || response.started !== true) throw new Error('Check-in start was not confirmed')
         } catch (failure) {
-          if (failure?.code === 'targets-changed') {
+          if (['targets-changed', 'account-changed'].includes(failure?.code)) {
             needsRefresh = true
-            runIssue = 'targetsChanged'
+            runIssue = failure.code === 'account-changed' ? 'accountChanged' : 'targetsChanged'
           } else {
             runIssue = 'runFailed'
           }
@@ -914,10 +940,12 @@ window.__ModuleLoader__.load({
       }
       return {
         patchDraft, refresh, runNow,
+        acceptSaved: () => { if (canEdit()) saves.acceptSaved() },
         cancelDebounce: () => clearTimeout(timer),
         view: () => {
           const { targets, blocked } = selection()
-          return { status, error, draft, runIssue, targets, runBlocked: blocked }
+          const { pending, failed } = saves.view()
+          return { status, error, draft: canEdit() ? draft : null, canEdit: canEdit(), runIssue, targets, runBlocked: blocked, saveFeedback: failed ?? (pending ? 'saving' : null) }
         },
       }
     }
@@ -1201,12 +1229,13 @@ window.__ModuleLoader__.load({
       if (lastError === null || lastError === undefined) return null
       const at = String(lastError.at ?? '')
       if (dismissed === at) return null
+      const captcha = gameCaptcha(lastError.code)
       const text = lastError.code === 'LOGIN_EXPIRED'
         ? t('badgeExpired')
-        : lastError.code === 'CAPTCHA'
+        : captcha
           ? t('badgeCaptcha')
           : t('badgeRun')
-      return h('div', { className: 'mys-badge', role: 'status', title: t('badgeOpen') },
+      return h('div', { className: 'mys-badge', 'data-tone': captcha ? 'warn' : 'error', role: 'status', title: t('badgeOpen') },
         h('span', { className: 'mys-badge-text' }, text),
         h('button', {
           type: 'button',
@@ -1229,7 +1258,7 @@ window.__ModuleLoader__.load({
       const [verifyInfo, setVerifyInfo] = useState(null)
       const [deleteArmed, setDeleteArmed] = useState(false)
       const panel = useCheckinPanel(__status)
-      const { status, error, draft, runIssue, targets, runBlocked } = panel.view()
+      const { status, error, draft, runIssue, targets, runBlocked, canEdit, saveFeedback } = panel.view()
       const { refresh, patchDraft, runNow } = panel
       const loginFlow = useMysLogin({ t, refresh, onNotice: setNotice })
 
@@ -1293,6 +1322,7 @@ window.__ModuleLoader__.load({
 
       const config = draft
       const games = status?.games ?? []
+      const gameZone = status?.timezone ?? status?.config?.timezone ?? COMMUNITY_ZONE
       const lastResult = status?.lastResult ?? null
       const lastError = status?.lastError ?? null
 
@@ -1314,7 +1344,7 @@ window.__ModuleLoader__.load({
             h('div', { className: 'mys-banner-actions' },
               h(Button, { variant: 'primary', onClick: loginFlow.startLogin, disabled: loginFlow.busy }, t('relogin'))))
         }
-        if (code === 'CAPTCHA') {
+        if (gameCaptcha(code)) {
           return h('div', { className: 'mys-banner', 'data-tone': 'warn' },
             h('div', null, t('bannerCaptcha')),
             h('div', { className: 'mys-hint' }, String(lastError.message ?? '')))
@@ -1330,6 +1360,7 @@ window.__ModuleLoader__.load({
       const reasonKey = plan.reason === 'missed' ? 'reasonMissed' : plan.reason === 'inside' ? 'reasonInside' : plan.reason === 'done-today' ? 'reasonDoneToday' : plan.reason === 'passed' ? 'reasonPassed' : 'reasonWindow'
 
       const enabled = config?.enabled === true
+      const verifyValid = verifyInfo?.reachable === true && verifyInfo?.sessionValid === true
       const windowsText = (config?.windows ?? []).map((window) => `${window.start}–${window.end}`).join('、')
       const taskState = enabled !== true
         ? { label: t('taskStatePaused'), tone: '' }
@@ -1348,7 +1379,7 @@ window.__ModuleLoader__.load({
             h(Button, {
               variant: 'primary',
               disabled: runBlocked !== null,
-              'aria-describedby': runBlocked !== null ? 'mys-run-hint' : undefined,
+              'aria-describedby': saveFeedback !== null ? 'mys-save-status' : runBlocked !== null ? 'mys-run-hint' : undefined,
               onClick: () => runNow(targets),
             }, runBlocked === 'runBusy' ? t('running') : t('runNow')),
             h(Button, {
@@ -1356,7 +1387,11 @@ window.__ModuleLoader__.load({
               onClick: () => patchDraft((next) => { next.enabled = !enabled; return next }),
             }, enabled ? t('taskPause') : t('taskResume')))),
 
-        h('div', { id: 'mys-run-hint', role: 'status', className: 'mys-hint', hidden: runBlocked === null }, runBlocked === null ? '' : t(runBlocked)),
+        h('div', { id: 'mys-run-hint', role: 'status', className: 'mys-hint', hidden: runBlocked === null || runBlocked === saveFeedback }, runBlocked === null || runBlocked === saveFeedback ? '' : t(runBlocked)),
+        h('div', { id: 'mys-save-status', role: 'status', 'aria-label': t('saveFeedback'), className: 'mys-banner', 'data-tone': saveFeedback === 'saving' ? undefined : 'warn', hidden: saveFeedback === null },
+          saveFeedback === null ? '' : t(saveFeedback),
+          saveFeedback !== null && saveFeedback !== 'saving' && canEdit
+            ? h('div', { className: 'mys-banner-actions' }, h(Button, { size: 'sm', onClick: panel.acceptSaved }, t('useSaved'))) : null),
         runIssue !== null ? h('div', { role: 'status', className: 'mys-banner', 'data-tone': 'warn' }, t(runIssue)) : null,
         error !== null ? h('div', { className: 'mys-banner', 'data-tone': 'error' }, fill(t('loadFailed'), { message: error })) : null,
         banner,
@@ -1373,7 +1408,7 @@ window.__ModuleLoader__.load({
             h('div', { className: 'mys-task-meta' },
               `${t('taskNextRun')}：${targetText === null ? t('noPlan') : `${targetText}（${t(reasonKey)}）`}`),
             h('div', { className: 'mys-task-meta' },
-              `${t('taskLastRun')}：${lastResult === null ? '—' : `${formatTime(lastResult.at)} · ${lastResult.summary ?? ''}`}`))),
+              `${t('taskLastRun')}：${lastResult === null ? '—' : `${recordTime(lastResult, gameZone, lastResult.date, t)} · ${lastResult.summary ?? ''}`}`))),
 
         h(Card, { title: t('account'), desc: t('accountDesc') },
           h('div', { className: 'mys-card-head' },
@@ -1416,14 +1451,15 @@ window.__ModuleLoader__.load({
             h(Button, { onClick: verify, disabled: busy.verify }, busy.verify ? t('verifying') : t('verify'))),
           verifyInfo === null ? null : h('div', {
             className: 'mys-banner',
-            'data-tone': verifyInfo.sessionValid === false || verifyInfo.reachable === false ? 'warn' : 'ok',
-          }, verifyInfo.sessionValid === null
-            ? t('verifyAnon')
-            : verifyInfo.reachable === false
-              ? fill(t('verifyFail'), { message: verifyInfo.message })
-              : verifyInfo.sessionValid === false
-                ? fill(t('verifyInvalid'), { message: verifyInfo.message })
-                : fill(t('verifyOk'), { ms: verifyInfo.elapsedMs ?? 0 }))),
+            role: 'status',
+            'data-tone': verifyValid ? 'ok' : verifyInfo.reachable === null ? undefined : 'warn',
+          }, verifyInfo.reachable === false
+            ? fill(t('verifyFail'), { message: verifyInfo.message })
+            : verifyInfo.reachable === null
+              ? t('verifyAnon')
+              : verifyValid ? fill(t('verifyOk'), { ms: verifyInfo.elapsedMs ?? 0 })
+                : verifyInfo.reachable === true && verifyInfo.sessionValid === false
+                  ? fill(t('verifyInvalid'), { message: verifyInfo.message ?? '—' }) : t('verifyUnavailable'))),
 
         h(Card, { title: t('auto'), desc: t('autoDesc') },
           h('div', { className: 'mys-row' },
@@ -1433,6 +1469,7 @@ window.__ModuleLoader__.load({
             h(Switch, {
               checked: config?.enabled === true,
               label: t('enabled'),
+              disabled: !canEdit,
               onChange: (value) => patchDraft((next) => { next.enabled = value; return next }),
             })),
 
@@ -1446,6 +1483,7 @@ window.__ModuleLoader__.load({
               h('input', {
                 className: 'mys-time',
                 type: 'time',
+                 disabled: !canEdit,
                 value: window.start,
                 'aria-label': t('windows'),
                 onChange: (event) => patchDraft((next) => {
@@ -1465,6 +1503,7 @@ window.__ModuleLoader__.load({
               h('input', {
                 className: 'mys-time',
                 type: 'time',
+                 disabled: !canEdit,
                 value: window.end,
                 'aria-label': t('windows'),
                 onChange: (event) => patchDraft((next) => {
@@ -1480,7 +1519,7 @@ window.__ModuleLoader__.load({
               h(Button, {
                 variant: 'danger',
                 size: 'sm',
-                disabled: (config?.windows ?? []).length <= 1,
+                disabled: !canEdit || (config?.windows ?? []).length <= 1,
                 onClick: () => patchDraft((next) => {
                   if (next.windows.length > 1) next.windows.splice(index, 1)
                   return next
@@ -1490,7 +1529,7 @@ window.__ModuleLoader__.load({
           h('div', { className: 'mys-actions' },
             h(Button, {
               size: 'sm',
-              disabled: (config?.windows ?? []).length >= 4,
+              disabled: !canEdit || (config?.windows ?? []).length >= 4,
               onClick: () => patchDraft((next) => {
                 if (next.windows.length >= 4) return next
                 const last = next.windows[next.windows.length - 1] ?? { start: '18:00', end: '18:30' }
@@ -1513,13 +1552,14 @@ window.__ModuleLoader__.load({
             h(Switch, {
               checked: config?.runWhenMissed === true,
               label: t('runWhenMissed'),
+              disabled: !canEdit,
               onChange: (value) => patchDraft((next) => { next.runWhenMissed = value; return next }),
             })),
 
           h('div', { className: 'mys-meta' },
             `${t('nextRun')}：${targetText === null ? t('noPlan') : `${targetText}（${t(reasonKey)}）`}`)),
 
-        h(Card, { title: t('projects'), desc: t('projectsDesc') },
+        h(Card, { title: t('projects'), desc: t('projectsDesc'), id: 'mys-targets' },
           h('div', { className: 'mys-list' },
             games.map((game) => h('label', { className: 'mys-row', key: game.id },
               h('span', { className: 'mys-row-label' },
@@ -1549,6 +1589,8 @@ window.__ModuleLoader__.load({
 
         h('section', { className: 'mys-page-section' },
           h('h2', null, t('taskRunHistory')),
+          h('div', { className: 'mys-hint' }, t('recordNote')),
+          h('h2', null, t('runTitle')),
           lastResult === null
             ? h('div', { className: 'mys-empty' }, t('noResult'))
             : (() => {
@@ -1557,15 +1599,11 @@ window.__ModuleLoader__.load({
                 const done = roled.filter((item) => item.outcome === 'signed' || item.outcome === 'already').length
                 const total = roled.length
                 const allDone = total > 0 && done === total
-                const at = new Date(lastResult.at)
-                const timeText = Number.isNaN(at.getTime())
-                  ? '—'
-                  : `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`
+                const timeText = recordTime(lastResult, gameZone, lastResult.date, t)
                 return h('div', { className: 'mys-run' },
                   h('div', { className: 'mys-summary' },
-                    h('div', { className: 'mys-summary-mark', 'aria-hidden': true }, '✓'),
+                    h('div', { className: 'mys-summary-mark', 'aria-hidden': true, 'data-done': allDone }, allDone ? '✓' : '–'),
                     h('div', { className: 'mys-summary-main' },
-                      h('div', { className: 'mys-summary-title' }, t('runTitle')),
                       h('div', { className: 'mys-summary-sub' }, `${t('runSigned')} `, h('b', null, String(done)), ` ${t('runAccounts')}`),
                       h('div', { className: 'mys-summary-sub' },
                         `${t('runAuto')}：${lastResult.reason === 'schedule' ? t('yes') : t('no')} | ${t('runAt')}：${timeText}`)),
@@ -1600,6 +1638,7 @@ window.__ModuleLoader__.load({
                   h('div', { className: 'mys-run-foot' }, allDone ? t('runFooterDone') : t('runFooterPartial')))
                })(),
           h(CommunityResults, { t, community: status?.community })),
+        h('div', { className: 'mys-page-section' }, h(CoinSnapshot, { t, balance: status?.community?.balance, balanceError: status?.community?.balanceError })),
 
         h('details', { className: 'mys-details' },
           h('summary', null, t('advanced')),
@@ -1607,24 +1646,28 @@ window.__ModuleLoader__.load({
             h('label', { className: 'mys-field' }, t('timezone'),
               h('input', {
                 className: 'mys-input',
+                disabled: !canEdit,
                 value: draft?.timezone ?? '',
                 onChange: (event) => patchDraft((next) => { next.timezone = event.target.value; return next }),
               })),
             h('label', { className: 'mys-field' }, t('appVersion'),
               h('input', {
                 className: 'mys-input',
+                disabled: !canEdit,
                 value: draft?.client?.appVersion ?? '',
                 onChange: (event) => patchDraft((next) => { next.client.appVersion = event.target.value; return next }),
               })),
             h('label', { className: 'mys-field' }, t('salt'),
               h('input', {
                 className: 'mys-input',
+                disabled: !canEdit,
                 value: draft?.client?.salt ?? '',
                 onChange: (event) => patchDraft((next) => { next.client.salt = event.target.value; return next }),
               })),
             h('label', { className: 'mys-field' }, `${t('gap')} · ${t('gapMin')}`,
               h('input', {
                 className: 'mys-input',
+                disabled: !canEdit,
                 type: 'number',
                 min: 1,
                 max: 60,
@@ -1634,6 +1677,7 @@ window.__ModuleLoader__.load({
             h('label', { className: 'mys-field' }, `${t('gap')} · ${t('gapMax')}`,
               h('input', {
                 className: 'mys-input',
+                disabled: !canEdit,
                 type: 'number',
                 min: 1,
                 max: 120,
@@ -1643,6 +1687,7 @@ window.__ModuleLoader__.load({
             h('label', { className: 'mys-field' }, `${t('retry')} · ${t('retryAttempts')}`,
               h('input', {
                 className: 'mys-input',
+                disabled: !canEdit,
                 type: 'number',
                 min: 0,
                 max: 3,
@@ -1652,6 +1697,7 @@ window.__ModuleLoader__.load({
             h('label', { className: 'mys-field' }, `${t('retry')} · ${t('retryDelay')}`,
               h('input', {
                 className: 'mys-input',
+                disabled: !canEdit,
                 type: 'number',
                 min: 10,
                 max: 900,
