@@ -99,6 +99,7 @@ function installFakeNetwork(options = {}) {
   }
 }
 
+const checkinRequest = (gameIds = ['genshin']) => new Request('http://x/api/mys/run/checkin', { method: 'POST', body: JSON.stringify({ gameIds, dabieye: false }) })
 const loginRequest = (action, body) => new Request('http://x/api/mys/login/' + action, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
 async function completeLogin(service) {
   const started = await service.routeLoginStart(loginRequest('start', { phone: '13800138000' }))
@@ -118,7 +119,6 @@ test('service wiring: routes, login, status', async (t) => {
   t.after(() => service.dispose())
 
   assert.deepEqual([...ctx.routes.keys()].sort(), [
-    '/api/mys/community/run',
     '/api/mys/config',
     '/api/mys/login/cancel',
     '/api/mys/login/captcha-frame',
@@ -129,7 +129,7 @@ test('service wiring: routes, login, status', async (t) => {
     '/api/mys/login/submit',
     '/api/mys/logout',
     '/api/mys/refresh',
-    '/api/mys/run',
+    '/api/mys/run/checkin',
     '/api/mys/status',
     '/api/mys/verify',
   ])
@@ -244,7 +244,7 @@ test('service runs one check-in per enabled game and records the result', async 
 
   await completeLogin(service)
 
-  const runResult = await service.routeRun(new Request('http://x/api/mys/run', { method: 'POST', body: '{}' }))
+  const runResult = await ctx.routes.get('/api/mys/run/checkin').fetch(checkinRequest()).then((response) => response.json())
   assert.equal(runResult.started, true)
   await service.runPromise
 
@@ -261,7 +261,7 @@ test('service runs one check-in per enabled game and records the result', async 
 
   // The binding query is cached for the day: a second run must not repeat it.
   const before = network.calls.filter((call) => call.url.includes('/binding/')).length
-  await service.routeRun(new Request('http://x/api/mys/run', { method: 'POST', body: '{}' }))
+  await ctx.routes.get('/api/mys/run/checkin').fetch(checkinRequest()).then((response) => response.json())
   await service.runPromise
   const after = network.calls.filter((call) => call.url.includes('/binding/')).length
   assert.equal(after, before)
@@ -276,7 +276,7 @@ test('service refuses manual runs while anonymous and applies config updates', a
   const service = new MysService(ctx, {})
   t.after(() => service.dispose())
 
-  const refused = await service.routeRun(new Request('http://x/api/mys/run', { method: 'POST', body: '{}' }))
+  const refused = await ctx.routes.get('/api/mys/run/checkin').fetch(checkinRequest(['genshin', 'starrail', 'zzz', 'honkai3'])).then((response) => response.json())
   assert.equal(refused.started, false)
   assert.equal(refused.error.code, 'anonymous')
 
@@ -315,7 +315,7 @@ test('expired session marks the banner and stops the run', async (t) => {
   }
   service.store.setConfig(service.config)
 
-  await service.routeRun(new Request('http://x/api/mys/run', { method: 'POST', body: '{}' }))
+  await ctx.routes.get('/api/mys/run/checkin').fetch(checkinRequest()).then((response) => response.json())
   await service.runPromise
 
   const status = await service.routeStatus()

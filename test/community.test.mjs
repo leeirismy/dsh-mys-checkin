@@ -7,7 +7,7 @@ import { communityCapability, signCommunity, getCommunityBalance } from '../lib/
 // Synthetic contract fixtures only — not real captured API responses.
 const config = normalizeConfig({ community: { enabled: true } })
 const auth = { aid: '123', mid: 'synthetic-mid', cookies: { stoken_v2: 'v2_synthetic-secret', ltoken: 'synthetic-ltoken', ltuid: '123' } }
-const options = { config, auth, deviceId: 'synthetic-device', gid: '5' }
+const options = { config, auth, deviceId: 'synthetic-device' }
 function fake(t, handler) {
   const original = globalThis.fetch
   const calls = []
@@ -27,10 +27,10 @@ test('capability is safe, V2 needs mid, V1 needs a numeric account, web-only aut
   assert.equal(JSON.stringify(communityCapability(auth)).includes('synthetic'), false)
 })
 
-test('exact body bytes are signed with dedicated DS2 and minimum normalized V2 cookie', async (t) => {
+test('签名仅使用固定字符串 5 with dedicated DS2 and minimum normalized V2 cookie', async (t) => {
   const before = structuredClone(auth)
   const calls = fake(t, () => response({ retcode: 0 }))
-  const result = await signCommunity(options)
+  const result = await signCommunity({ ...options, gid: '2' })
   assert.equal(result.outcome, 'success')
   assert.equal(calls.length, 1)
   const { url, init } = calls[0]
@@ -49,12 +49,11 @@ test('exact body bytes are signed with dedicated DS2 and minimum normalized V2 c
   assert.deepEqual(auth, before)
 })
 
-test('V1 cookie has no unsolicited mid and missing capability/unsupported gid makes no request', async (t) => {
+test('V1 cookie has no unsolicited mid and missing capability makes no request', async (t) => {
   const calls = fake(t, () => response({ retcode: 0, data: null }))
   assert.equal((await signCommunity({ ...options, auth: { cookies: { stuid: '123', stoken: 'v1-secret' } } })).outcome, 'success')
   assert.equal(new Headers(calls[0].init.headers).get('cookie'), 'stuid=123; stoken=v1-secret')
   assert.equal((await signCommunity({ ...options, auth: null })).outcome, 'auth-unavailable')
-  assert.equal((await signCommunity({ ...options, gid: '9' })).outcome, 'error')
   assert.equal(calls.length, 1)
 })
 
