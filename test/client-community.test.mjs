@@ -8,13 +8,17 @@ const source = fs.readFileSync(new URL('../client.js', import.meta.url), 'utf8')
   "      inject: ['slots', 'locale'],",
   "      units: { createCheckinPanel: typeof createCheckinPanel === 'function' && createCheckinPanel, createConfigSaveQueue: typeof createConfigSaveQueue === 'function' && createConfigSaveQueue }, inject: ['slots', 'locale'],",
 )
-function harness({ respond = () => { throw new Error('Unexpected offline request') }, locale = 'zh' } = {}) {
-  let plugin, dictionaries
+function harness({ respond = () => { throw new Error('Unexpected offline request') }, locale = 'zh', keepPanel = false } = {}) {
+  let plugin, dictionaries, panel
   const slots = new Map(), requests = [], timers = new Map()
   let timerId = 0
   const React = {
     createElement: (type, props, ...children) => ({ type, props: { ...props, children } }),
-    useState: (init) => [typeof init === 'function' ? init() : init, () => {}],
+    useState(init) {
+      const value = typeof init === 'function' ? init() : init
+      // Share only the controller across two explicit element descriptions.
+      return [keepPanel && value?.runNow && value?.refresh ? (panel ??= value) : value, () => {}]
+    },
     useEffect: () => {}, useRef: (current) => ({ current }),
     useCallback: (fn) => fn, useMemo: (fn) => fn(),
   }
@@ -41,6 +45,7 @@ function harness({ respond = () => { throw new Error('Unexpected offline request
   const t = (key) => dictionaries[locale][key] ?? key
   return {
     tree: (status) => slots.get('main')({ t, __status: status }), t, requests, ...plugin.units,
+    refreshPanel: () => panel.refresh(),
     tickSave() {
       assert.equal(timers.size, 1)
       const [id, { fn, delay }] = timers.entries().next().value
@@ -113,6 +118,23 @@ for (const [gameIds, dabieye] of [[['genshin'], true], [['genshin'], false], [[]
     assert.deepEqual(writes(h), [{ path: runPath, method: 'POST', body: { gameIds, dabieye } }])
   })
 }
+
+test('an enabled button captured before a status refresh cannot post targets it did not show', async () => {
+  const original = fixture(config(['genshin'], false)), fresh = fixture(config(['starrail'], true))
+  const h = harness({ keepPanel: true, respond: ({ method }) => method === 'GET' ? fresh : { ok: true, started: true } })
+  const stale = launch(h.tree(original), h)
+  assert.equal(stale.props.disabled, false)
+  await h.refreshPanel()
+  await stale.props.onClick()
+  assert.deepEqual(writes(h), [], 'stale button must not post the new, unseen target set')
+
+  const updated = h.tree()
+  assert.match(text(updated), /查看更新后的签到项目.*再次点击/)
+  const current = launch(updated, h)
+  assert.equal(current.props.disabled, false)
+  await current.props.onClick()
+  assert.deepEqual(writes(h), [{ path: runPath, method: 'POST', body: { gameIds: ['starrail'], dabieye: true } }])
+})
 
 test('empty, loading, and Host-busy panels never send a check-in even if callback is invoked', async () => {
   for (const [status, hint] of [[fixture(config([], false)), /至少.*签到项目/], [null, /加载/], [{ ...fixture(), running: true }, /签到.*进行/]]) {
@@ -203,19 +225,19 @@ test('new debounce immediately blocks run through superseded success, failed sav
   a.resolve({ ok: true, config: config(['genshin', 'starrail'], true) }); await saveA
   assert.equal(panel.view().runBlocked, 'saving', 'A does not unlock while B is still in debounce')
   assert.equal(panel.view().draft.games.genshin, false)
-  await panel.runNow()
+  await panel.runNow(panel.view().targets)
   const saveB = h.tickSave()
   b.resolve({ ok: false, error: { code: 'save-refused', message: 'synthetic save rejection' } }); await saveB
   await panel.refresh()
   assert.equal(panel.view().runBlocked, 'saveFail')
   assert.equal(panel.view().draft.games.genshin, false)
-  await panel.runNow()
+  await panel.runNow(panel.view().targets)
   assert.equal(writes(h).filter((r) => r.path === runPath).length, 0)
   edit('starrail', true)
   const saveC = h.tickSave()
   c.resolve({ ok: true, config: config(['starrail'], false) }); await saveC
   assert.equal(panel.view().draft.community.enabled, false)
-  await panel.runNow()
+  await panel.runNow(panel.view().targets)
   assert.deepEqual(writes(h).filter((r) => r.path === runPath), [{ path: runPath, method: 'POST', body: { gameIds: ['starrail'], dabieye: false } }])
 })
 
@@ -234,7 +256,7 @@ test('status GET started before save cannot resurrect the old confirmed selectio
   await h.tickSave()
   old.resolve(original); await stale
   assert.equal(panel.view().draft.games.genshin, false)
-  await panel.runNow()
+  await panel.runNow(panel.view().targets)
   assert.deepEqual(writes(h).filter((r) => r.path === runPath), [{ path: runPath, method: 'POST', body: { gameIds: ['starrail'], dabieye: false } }])
 })
 
@@ -247,13 +269,13 @@ test('targets-changed enters refresh, prevents duplicates, and never retries the
   } })
   assert.equal(typeof h.createCheckinPanel, 'function', 'panel request controller is present')
   const panel = h.createCheckinPanel({ initialStatus: status, changed() {} })
-  const first = panel.runNow()
+  const first = panel.runNow(panel.view().targets)
   assert.equal(panel.view().runBlocked, 'runBusy')
-  await panel.runNow()
+  await panel.runNow(panel.view().targets)
   start.resolve({ ok: false, started: false, error: { code: 'targets-changed', message: '已保存的签到项目已变更，请刷新后再试' } })
   await refreshStarted.promise
   assert.equal(panel.view().runIssue, 'targetsChanged')
-  await panel.runNow()
+  await panel.runNow(panel.view().targets)
   assert.deepEqual(h.requests.map((r) => r.path), [runPath, '/api/mys/status'])
   refresh.resolve(fixture(config([], false))); await first
   assert.equal(panel.view().runBlocked, 'noTargets')
@@ -271,7 +293,7 @@ test('failed status read blocks stale targets until a successful read', async ()
   const panel = h.createCheckinPanel({ initialStatus: status, changed() {} })
   await panel.refresh()
   assert.equal(panel.view().runBlocked, 'runOffline')
-  await panel.runNow()
+  await panel.runNow(panel.view().targets)
   assert.deepEqual(writes(h), [])
   online = true
   await panel.refresh()

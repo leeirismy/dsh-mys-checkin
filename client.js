@@ -247,6 +247,7 @@ window.__ModuleLoader__.load({
       runBusy: '签到正在进行，请稍候。',
       runLogin: '请先短信登录。',
       noTargets: '请至少选中一个签到项目。',
+      staleTargets: '签到项目刚刚变更。请查看更新后的签到项目，确认后再次点击「立即签到」。',
       targetsChanged: '已保存的签到项目已变更。请查看最新设置，再决定是否签到。未自动重试。',
       runFailed: '签到请求未确认完成。请查看结果，不要立即重复签到。',
       runNow: '立即签到',
@@ -447,6 +448,7 @@ window.__ModuleLoader__.load({
       runBusy: 'A check-in is in progress. Please wait.',
       runLogin: 'Sign in by SMS first.',
       noTargets: 'Select at least one check-in target.',
+      staleTargets: 'The targets just changed. Review the updated selection, then click Check in now again.',
       targetsChanged: 'The saved targets changed. Review the latest settings before checking in. The request was not retried.',
       runFailed: 'The check-in request did not confirm completion. Review the results before trying again.',
       runNow: 'Check in now',
@@ -879,9 +881,18 @@ window.__ModuleLoader__.load({
                     : !status?.login || status.login.state === 'anonymous' ? 'runLogin' : null
         return { targets, blocked }
       }
-      async function runNow() {
+      async function runNow(renderedTargets) {
         const { targets, blocked } = selection()
         if (blocked !== null) return
+        // A status callback may have updated the controller before React has
+        // committed the new selection. Never send targets that button didn't show.
+        if (renderedTargets.dabieye !== targets.dabieye
+          || renderedTargets.gameIds.length !== targets.gameIds.length
+          || !renderedTargets.gameIds.every((id) => targets.gameIds.includes(id))) {
+          runIssue = 'staleTargets'
+          changed()
+          return
+        }
         running = true
         runIssue = null
         changed()
@@ -904,7 +915,10 @@ window.__ModuleLoader__.load({
       return {
         patchDraft, refresh, runNow,
         cancelDebounce: () => clearTimeout(timer),
-        view: () => ({ status, error, draft, runIssue, runBlocked: selection().blocked }),
+        view: () => {
+          const { targets, blocked } = selection()
+          return { status, error, draft, runIssue, targets, runBlocked: blocked }
+        },
       }
     }
 
@@ -1215,7 +1229,7 @@ window.__ModuleLoader__.load({
       const [verifyInfo, setVerifyInfo] = useState(null)
       const [deleteArmed, setDeleteArmed] = useState(false)
       const panel = useCheckinPanel(__status)
-      const { status, error, draft, runIssue, runBlocked } = panel.view()
+      const { status, error, draft, runIssue, targets, runBlocked } = panel.view()
       const { refresh, patchDraft, runNow } = panel
       const loginFlow = useMysLogin({ t, refresh, onNotice: setNotice })
 
@@ -1335,7 +1349,7 @@ window.__ModuleLoader__.load({
               variant: 'primary',
               disabled: runBlocked !== null,
               'aria-describedby': runBlocked !== null ? 'mys-run-hint' : undefined,
-              onClick: runNow,
+              onClick: () => runNow(targets),
             }, runBlocked === 'runBusy' ? t('running') : t('runNow')),
             h(Button, {
               disabled: config === null,
