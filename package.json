@@ -2,7 +2,7 @@
   "name": "@local/dsh-mys-checkin",
   "version": "0.2.1",
   "private": true,
-  "description": "米游社每日自动签到（DSH 侧边栏面板）：扫码登录、窗口内随机执行、失败提示与防检测节奏。",
+  "description": "米游社每日签到（DSH 侧边栏）：短信登录、官方人工验证、独立游戏与社区签到、随机时间窗口与失败提示。",
   "type": "module",
   "main": "index.js",
   "exports": {
@@ -15,7 +15,9 @@
     "client.js",
     "lib",
     "cordis.patch.yml",
-    "README.md"
+    "README.md",
+    "THIRD_PARTY_NOTICES.md",
+    "LICENSE"
   ],
   "engines": {
     "node": ">=22"
