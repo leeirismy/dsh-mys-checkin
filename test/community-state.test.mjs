@@ -17,25 +17,24 @@ function storeFor(raw, entryConfig = {}) {
 
 test('old config stays opt-in with independent community protocol defaults', () => {
   const config = normalizeConfig({ games: { genshin: false } })
-  assert.equal(config.community?.enabled, false)
-  assert.deepEqual(config.community.gids, ['5', '2'])
-  assert.equal(config.community.client.appVersion, '2.117.0')
-  assert.equal(config.community.client.salt, 't0qEgfub6cvueAPgR5m9aQWWVciEer7v')
+  assert.deepEqual(config.community, { enabled: false, client: { appVersion: '2.117.0', salt: 't0qEgfub6cvueAPgR5m9aQWWVciEer7v' } })
+  assert.equal(defaultConfig().community.enabled, false)
   assert.equal(config.client.appVersion, '2.109.0')
   assert.equal(config.games.genshin, false)
-  defaultConfig().community.gids.push('6')
-  assert.deepEqual(defaultConfig().community.gids, ['5', '2'])
 })
 
-test('explicit empty selection stays empty and unsupported communities cannot be requested', () => {
-  assert.deepEqual(normalizeConfig({ community: { enabled: true, gids: [] } }).community?.gids, [])
-  assert.deepEqual(normalizeConfig({ community: { gids: [5, '2', '2', 999, '9', {}, null] } }).community.gids, ['5', '2'])
-  assert.deepEqual(normalizeConfig({ community: { gids: '5' } }).community.gids, ['5', '2'])
-  const config = normalizeConfig({ community: { enabled: true, client: { appVersion: 'custom', salt: 'local-salt' } } })
-  assert.equal(config.community.enabled, true)
-  assert.equal(config.community.client.appVersion, 'custom')
-  assert.equal(config.community.client.salt, 'local-salt')
-  assert.equal(config.client.salt, 'd9200c846b10886e8c874fc33c8f308b')
+test('旧社区名单仅保留已有大别野授权', () => {
+  for (const [input, enabled] of [
+    [{ enabled: true, gids: ['2'] }, false], [{ enabled: true, gids: [] }, false],
+    [{ enabled: true, gids: null }, false], [{ enabled: true, gids: '5' }, false],
+    [{ enabled: true, gids: [' 5', '05', {}, null] }, false],
+    [{ enabled: true, gids: ['2', 5, '5'] }, true], [{ enabled: true, gids: [5] }, true],
+    [{ enabled: false, gids: ['5'] }, false], [{ enabled: true }, true],
+  ]) {
+    const config = normalizeConfig({ community: { ...input, client: { appVersion: 'custom', salt: 'local-salt' } } })
+    assert.deepEqual(config.community, { enabled, client: { appVersion: 'custom', salt: 'local-salt' } }, JSON.stringify(input))
+    assert.equal(config.client.salt, 'd9200c846b10886e8c874fc33c8f308b')
+  }
 })
 
 test('v1 migration preserves games and consumes the legacy scheduled day conservatively', () => {
@@ -57,37 +56,57 @@ test('v2 community results and balance survive close/reload without reviving old
   const at = Date.parse('2026-11-18T09:00:00+08:00')
   const community = {
     accountId: '123', lastRunAt: at, lastError: null,
-    lastResult: { at, finishedAt: at + 1, reason: 'manual', day: '2026-11-18', gids: ['5', '2'], ok: false,
+    lastResult: { at, finishedAt: at + 1, reason: 'manual', day: '2026-11-18', gids: ['5'], ok: true,
       results: [{ gid: '5', label: '大别野', day: '2026-11-18', at, outcome: 'success', message: '已签到', retcode: 0 }] },
+    uncertainAttempt: null,
     balance: { totalPoints: 123, todayReceived: 30, todayRemaining: 60, at, day: '2026-11-18' },
     balanceError: { code: 'query-failed', message: '查询失败' },
     signedDays: { 5: { day: '2026-11-18', at } },
   }
   store.patchRuntime({ lastRunDate: '2026-11-18', scheduleLastAttemptDate: null, community })
-  store.setConfig(normalizeConfig({ community: { enabled: true, gids: [] } }))
+  store.setConfig(normalizeConfig({ community: { enabled: true } }))
   store.close()
   const reloaded = new StateStore({ directory: store.directory })
   const state = reloaded.load()
   assert.deepEqual(state.runtime.community, community)
   assert.equal(state.runtime.scheduleLastAttemptDate, null)
-  assert.deepEqual(state.config.community.gids, [])
+  assert.equal(state.config.community.enabled, true)
+  assert.equal(Object.hasOwn(state.config.community, 'gids'), false)
   reloaded.close()
 })
 
-test('community Host overrides work on old/new stores while saved user choices win', () => {
-  const entryConfig = { community: { enabled: true, gids: ['6'], client: { appVersion: 'host-version', salt: 'host-salt' } } }
-  for (const raw of [undefined, { version: 1, config: { enabled: false } }]) {
+test('saved modern enabled does not inherit a stale Host gid selector', () => {
+  const entryConfig = { community: { enabled: true, gids: ['2'], client: { appVersion: 'host-version', salt: 'host-salt' } } }
+  for (const [raw, enabled] of [
+    [undefined, false], [{ version: 1, config: { enabled: false } }, false],
+    [{ config: { community: { enabled: false, gids: [] } } }, false],
+    [{ config: { community: { enabled: true, gids: ['5'] } } }, true],
+    [{ config: { community: { enabled: true } } }, true],
+  ]) {
     const store = storeFor(raw, entryConfig)
-    assert.equal(store.get().config.community.enabled, true)
-    assert.deepEqual(store.get().config.community.gids, ['6'])
-    assert.equal(store.get().config.community.client.salt, 'host-salt')
+    assert.deepEqual(store.get().config.community, { enabled, client: entryConfig.community.client })
     store.close()
   }
-  const store = storeFor({ version: 2, config: { community: { enabled: false, gids: [] } } }, entryConfig)
-  assert.equal(store.get().config.community.enabled, false)
-  assert.deepEqual(store.get().config.community.gids, [])
-  assert.equal(store.get().config.community.client.salt, 'host-salt')
-  store.close()
+})
+
+test('旧社区记录只恢复大别野', () => {
+  const day = '2026-11-18', at = Date.parse(`${day}T09:00:00+08:00`)
+  const balance = { at, day, totalPoints: 42, todayReceived: 10, todayRemaining: 0 }
+  const lastError = { code: 'captcha', message: 'Old partition error', at }
+  const other = { gid: '2', day, at, outcome: 'captcha', message: 'Old partition error' }
+  const dabieye = { gid: '5', label: '大别野', day, at, outcome: 'success', message: 'Accepted' }
+  for (const result of [dabieye, { ...dabieye, outcome: 'error', message: 'Dabieye failure' }, null]) {
+    const lastResult = { at, finishedAt: at, reason: 'manual', day, gids: ['5', '2'], ok: false, results: [other, ...(result ? [result] : [])] }
+    const signedDays = { 5: { day, at }, 2: { day, at } }
+    const store = storeFor({ version: 2, runtime: { community: { accountId: '123', balance, lastRunAt: at, lastError, lastResult, signedDays } } })
+    const clean = store.get().runtime.community
+    assert.deepEqual(clean.balance, balance)
+    assert.deepEqual(clean.signedDays, { 5: { day, at } })
+    assert.equal(clean.lastRunAt, result ? at : null)
+    assert.deepEqual(clean.lastError, result?.outcome === 'error' ? { code: 'error', message: result.message, at } : null)
+    assert.deepEqual(clean.lastResult, result ? { ...lastResult, gids: ['5'], ok: result.outcome === 'success', results: [result] } : null)
+    store.close()
+  }
 })
 
 test('malformed saved community state cannot supply unsupported targets or raw response objects', () => {
@@ -104,4 +123,33 @@ test('malformed saved community state cannot supply unsupported targets or raw r
   assert.equal(community.balance.todayRemaining, 4)
   assert.equal(JSON.stringify(community).includes('secret'), false)
   store.close()
+})
+
+test('migration reserves only account-bound, dated Dabieye unknown outcomes', () => {
+  const day = '2026-11-19', at = Date.parse('2026-11-18T20:00:00Z')
+  for (const [accountId, item, expected] of [
+    ['123', { gid: '5', outcome: 'unknown', day, at }, { gid: '5', day, at }],
+    ['123', { gid: '2', outcome: 'unknown', day, at }, null],
+    ['123', { gid: '5', outcome: 'unknown', day: '2026-11-18', at }, null],
+    ['123', { gid: '5', outcome: 'error', day, at }, null],
+    ['bad', { gid: '5', outcome: 'unknown', day, at }, null],
+  ]) {
+    const store = storeFor({ runtime: { community: { accountId, lastResult: { results: [item] } } } })
+    assert.deepEqual(store.get().runtime.community.uncertainAttempt, expected)
+    store.close()
+  }
+})
+
+test('standalone Dabieye diagnostic survives reload without erasing prior success', () => {
+  const day = '2026-11-19', at = Date.parse('2026-11-18T20:00:00Z')
+  const lastError = { gid: '5', code: 'unknown', message: 'Scoped diagnostic', at: at + 2 }
+  const signedDays = { 5: { day, at } }
+  const lastResult = { gids: ['5'], day, at, ok: true, results: [{ gid: '5', outcome: 'success', day, at }] }
+  for (const previous of [lastResult, undefined]) {
+    const store = storeFor({ runtime: { community: { accountId: '123', lastResult: previous, lastError, signedDays } } })
+    assert.deepEqual(store.get().runtime.community.lastError, lastError)
+    assert.deepEqual(store.get().runtime.community.signedDays, signedDays)
+    if (previous) assert.equal(store.get().runtime.community.lastResult.ok, true)
+    store.close()
+  }
 })

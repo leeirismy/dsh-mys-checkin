@@ -8,6 +8,10 @@ import { normalizeConfig } from '../lib/config.js'
 
 const request = (route = 'logout', body = {}) => new Request(`http://owner.invalid/api/mys/${route}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
 const reply = (body) => new Response(JSON.stringify(body), { status: 200 })
+const rolePath = '/binding/api/getUserGameRolesByCookie'
+const infoPath = '/event/luna/hk4e/info'
+const gameSignPath = '/event/luna/hk4e/sign'
+const communitySignPath = '/apihub/app/api/signIn'
 const balancePath = '/apihub/wapi/getUserMissionsState'
 const deferred = () => { let resolve; const promise = new Promise((r) => { resolve = r }); return { promise, resolve } }
 function syntheticAuth(id = '123') {
@@ -16,7 +20,8 @@ function syntheticAuth(id = '123') {
 function setup(t, handler = () => undefined) {
   const oldHome = process.env.DSH_HOME
   const original = globalThis.fetch
-  process.env.DSH_HOME = fs.mkdtempSync(path.join(os.tmpdir(), 'mys-community-service-'))
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'mys-community-service-'))
+  process.env.DSH_HOME = home
   const calls = [], unexpected = [], routes = new Map()
   globalThis.fetch = async (url, init) => {
     const call = { url, init, pathname: new URL(url).pathname }
@@ -31,11 +36,12 @@ function setup(t, handler = () => undefined) {
     unexpected.push(url)
     throw new Error('Unmatched fake request; real network is forbidden')
   }
-  const service = new MysService({
+  const mount = () => new MysService({
     logger: () => ({ info() {}, warn() {}, error() {} }),
     timeout: () => () => {},
     connection: { fetch: { register(route) { routes.set(route.path, route); return () => routes.delete(route.path) } } },
   })
+  const service = mount()
   service.config = normalizeConfig({ enabled: false, community: { enabled: true }, games: { genshin: false, starrail: false, zzz: false, honkai3: false, tears: false, bh2: false } })
   // No wall-clock waits in unit tests; normalization's public clamp has separate coverage.
   service.config.gapMs = { min: 0, max: 0 }
@@ -49,54 +55,106 @@ function setup(t, handler = () => undefined) {
     else process.env.DSH_HOME = oldHome
     assert.deepEqual(unexpected, [], 'every outbound request must match the offline fake')
   })
-  return { service, calls, routes, posts: () => calls.filter((call) => call.pathname === '/apihub/app/api/signIn') }
+  const checkin = async (body) => {
+    const route = routes.get('/api/mys/run/checkin')
+    assert.ok(route, 'unified check-in route must be registered')
+    return (await route.fetch(request('run/checkin', body && typeof body === 'object' && !Array.isArray(body) ? { accountRevision: service.statusPayload().accountRevision, ...body } : body))).json()
+  }
+  return { service, home, mount, calls, routes, checkin, posts: () => calls.filter((call) => call.pathname === '/apihub/app/api/signIn') }
 }
 async function finish(service) { const promise = service.runPromise; assert.ok(promise); await promise }
 
-test('manual community route runs with all games off, preserves other scopes, caches individual gids', async (t) => {
-  const { service, posts, routes } = setup(t)
-  assert.deepEqual(routes.get('/api/mys/community/run')?.methods, ['POST'])
-  const old = { lastResult: { synthetic: true }, lastError: { code: 'SYNTHETIC' }, lastRunDate: '2026-01-01', scheduleLastAttemptDate: '2026-01-02' }
+test('only unified POST accepts strict target snapshots and rejected requests never reach upstream', async (t) => {
+  const { service, routes, calls, checkin } = setup(t)
+  assert.equal(routes.has('/api/mys/run'), false)
+  assert.equal(routes.has('/api/mys/community/run'), false)
+  assert.deepEqual(routes.get('/api/mys/run/checkin')?.methods, ['POST'])
+  for (const body of [null, [], {}, { dabieye: true },
+    { gameIds: [], dabieye: 'true' }, { gameIds: 'genshin', dabieye: true },
+    { gameIds: [], dabieye: true, gids: ['2'] }, { gameIds: ['unknown'], dabieye: true },
+    { gameIds: [5], dabieye: false }, { gameIds: ['genshin', 'genshin'], dabieye: true },
+    { gameIds: [], dabieye: true, accountRevision: '123' },
+  ]) {
+    const result = await checkin(body)
+    assert.equal(result.error?.code, 'bad-request', JSON.stringify(body))
+    assert.equal(result.started, false)
+  }
+  const route = routes.get('/api/mys/run/checkin')
+  const malformed = await route.fetch(new Request('http://owner.invalid/api/mys/run/checkin', { method: 'POST', body: '{' }))
+  assert.equal((await malformed.json()).error?.code, 'bad-request')
+  for (const body of [{ gameIds: ['genshin'], dabieye: true }, { gameIds: [], dabieye: false }]) {
+    assert.equal((await checkin(body)).error?.code, 'targets-changed')
+  }
+  service.config.community.enabled = false
+  assert.equal((await checkin({ gameIds: [], dabieye: false })).error?.code, 'no-targets')
+  service.config.community.enabled = true
+  service.store.setAuth(null)
+  assert.equal((await checkin({ gameIds: [], dabieye: true })).error?.code, 'anonymous')
+  assert.equal(service.runPromise, null)
+  assert.deepEqual(calls, [])
+})
+
+test('manual Dabieye works with schedule off and preserves game state and same-day dedupe', async (t) => {
+  const { service, posts, checkin, calls } = setup(t)
+  const old = { lastResult: { synthetic: true }, lastError: { code: 'SYNTHETIC' }, lastRunDate: '2026-01-01', scheduleLastAttemptDate: null }
   service.store.patchRuntime(old)
-  assert.equal((await service.routeCommunityRun(request('community/run'))).started, true)
+  assert.equal((await checkin({ gameIds: [], dabieye: true })).started, true)
   await finish(service)
-  assert.deepEqual(posts().map(({ init }) => JSON.parse(init.body).gids), ['5', '2'])
+  assert.deepEqual(calls.map(({ pathname }) => pathname), [balancePath, communitySignPath, balancePath])
+  assert.equal(posts()[0].init.body, '{"gids":"5"}')
   for (const [key, value] of Object.entries(old)) assert.deepEqual(service.state.runtime[key], value)
-  assert.equal(service.statusPayload().community.lastResult.ok, true)
+  const { community } = service.statusPayload()
+  assert.equal(community.lastResult.ok, true)
+  assert.equal(Object.hasOwn(community, 'communities'), false)
   assert.equal(service.state.runtime.community.accountId, '123')
-  service.runCommunity(); await finish(service)
-  assert.equal(posts().length, 2)
-  assert.deepEqual(service.state.runtime.community.lastResult.results.map((r) => r.outcome), ['cached-success', 'cached-success'])
-  service.config.community.gids.push('6')
-  service.runCommunity(); await finish(service)
-  assert.deepEqual(posts().map(({ init }) => JSON.parse(init.body).gids), ['5', '2', '6'])
+  assert.equal((await checkin({ gameIds: [], dabieye: true })).started, true)
+  await finish(service)
+  assert.equal(posts().length, 1)
+  assert.deepEqual(service.state.runtime.community.lastResult.results.map((r) => r.outcome), ['cached-success'])
 })
 
-test('partial community config updates preserve saved selection and independent protocol overrides, including explicit empty gids', async (t) => {
-  const { service } = setup(t)
-  service.config.community = { enabled: true, gids: ['6'], client: { appVersion: '9.8.7', salt: 'synthetic-salt' } }
-  await service.routeConfig(request('config', { community: { enabled: false } }))
-  assert.deepEqual(service.config.community, { enabled: false, gids: ['6'], client: { appVersion: '9.8.7', salt: 'synthetic-salt' } })
-  await service.routeConfig(request('config', { community: { gids: [], client: { salt: 'new-synthetic-salt' } } }))
-  assert.deepEqual(service.config.community, { enabled: false, gids: [], client: { appVersion: '9.8.7', salt: 'new-synthetic-salt' } })
-})
-
-test('partial failure and ambiguous writes stay distinct; account mission 58 does not skip gids', async (t) => {
-  const { service, posts } = setup(t, ({ pathname, init }) => {
-    if (pathname === '/apihub/app/api/signIn' && JSON.parse(init.body).gids === '2') return reply({ retcode: -5003, message: 'already signed' })
+test('games-only manual snapshot compares as a set and preserves GAMES order without re-signing', async (t) => {
+  const { service, checkin, calls } = setup(t, ({ pathname, url }) => {
+    if (pathname === rolePath && new URL(url).searchParams.get('game_biz') === 'hkrpg_cn') return reply({ retcode: 0, data: { list: [] } })
+    if (pathname === infoPath) return reply({ retcode: 0, data: { is_sign: true } })
   })
-  service.runCommunity(); await finish(service)
-  assert.deepEqual(service.state.runtime.community.lastResult.results.map((r) => r.outcome), ['success', 'error'])
+  service.config.community.enabled = false
+  service.config.games.genshin = true
+  service.config.games.starrail = true
+  assert.equal((await checkin({ gameIds: ['starrail', 'genshin'], dabieye: false })).started, true)
+  await finish(service)
+  assert.deepEqual(calls.map(({ pathname }) => pathname), [rolePath, infoPath, rolePath])
+  assert.deepEqual(service.state.runtime.lastResult.results.map(({ game, outcome }) => [game, outcome]), [['genshin', 'already'], ['starrail', 'no-role']])
+  assert.equal(service.state.runtime.scheduleLastAttemptDate, null)
+})
+
+test('partial community config updates preserve protocol overrides but reject any gid list', async (t) => {
+  const { service } = setup(t)
+  service.config.community = { enabled: true, client: { appVersion: '9.8.7', salt: 'synthetic-salt' } }
+  const rejected = await service.routeConfig(configWrite({ community: { enabled: false, gids: [], client: { salt: 'ignored' } } }, service.statusPayload().configRevision))
+  assert.equal(rejected.error?.code, 'bad-request')
+  assert.equal(service.config.community.enabled, true)
+  const updated = await service.routeConfig(configWrite({ community: { enabled: false, client: { salt: 'new-synthetic-salt' } } }, service.statusPayload().configRevision))
+  assert.equal(updated.ok, true)
+  assert.deepEqual(service.config.community, { enabled: false, client: { appVersion: '9.8.7', salt: 'new-synthetic-salt' } })
+})
+
+test('account mission 58 cannot skip the Dabieye write or turn a rejection into acceptance', async (t) => {
+  const { service, posts } = setup(t, ({ pathname }) => pathname === communitySignPath ? reply({ retcode: -5003, message: 'already signed' }) : undefined)
+  assert.equal(service.run('manual').started, true); await finish(service)
+  assert.deepEqual(service.state.runtime.community.lastResult.results.map((r) => r.outcome), ['error'])
   assert.equal(service.state.runtime.community.lastResult.ok, false)
-  assert.equal(posts().length, 2)
+  assert.equal(posts().length, 1)
 })
 
 test('lost POST response is unknown once, with no secret/URL reflected in community status or logs', async (t) => {
-  const { service, posts } = setup(t, ({ pathname }) => {
+  const { service, posts, checkin } = setup(t, ({ pathname }) => {
     if (pathname === '/apihub/app/api/signIn') throw new Error('https://fake.invalid/?stoken=secret-stoken&mid=secret-mid')
   })
-  service.config.community.gids = ['5']
-  service.runCommunity(); await finish(service)
+  service.config.games.genshin = true
+  assert.equal((await checkin({ gameIds: ['genshin'], dabieye: true })).started, true)
+  await finish(service)
+  assert.equal(service.state.runtime.lastResult.ok, true)
   assert.equal(posts().length, 1)
   assert.equal(service.state.runtime.community.lastResult.results[0].outcome, 'unknown')
   assert.doesNotMatch(JSON.stringify(service.statusPayload()), /secret-stoken|secret-mid|secret-ltoken|https:\/\/fake/)
@@ -108,61 +166,51 @@ test('balance failure is independent, while CAPTCHA in either query or sign bloc
     if (pathname === '/apihub/wapi/getUserMissionsState') return reply({ retcode: mode === 'query-captcha' ? 1034 : -1 })
     if (pathname === '/apihub/app/api/signIn' && mode === 'sign-captcha') return reply({ retcode: 1034 })
   })
-  service.runCommunity(); await finish(service)
-  assert.equal(posts().length, 2)
+  service.run('manual'); await finish(service)
+  assert.equal(posts().length, 1)
   assert.equal(service.state.runtime.community.lastResult.ok, true)
   assert.ok(service.state.runtime.community.balanceError)
   service.state.runtime.community.signedDays = {}
   mode = 'query-captcha'
-  service.runCommunity(); await finish(service)
-  assert.equal(posts().length, 2)
+  service.run('manual'); await finish(service)
+  assert.equal(posts().length, 1)
   assert.equal(service.state.runtime.community.lastResult.ok, false)
   mode = 'sign-captcha'
-  service.runCommunity(); await finish(service)
-  assert.equal(posts().length, 3)
-  assert.deepEqual(service.state.runtime.community.lastResult.results.map((r) => r.outcome), ['captcha', 'skipped'])
+  service.run('manual'); await finish(service)
+  assert.equal(posts().length, 2)
+  assert.deepEqual(service.state.runtime.community.lastResult.results.map((r) => r.outcome), ['captcha'])
 })
 
 test('community expiration never invalidates the shared game login', async (t) => {
   const { service } = setup(t, ({ pathname }) => pathname === '/apihub/app/api/signIn' ? reply({ retcode: -100 }) : undefined)
-  service.config.community.gids = ['5']
   const auth = structuredClone(service.state.auth)
-  service.runCommunity(); await finish(service)
+  service.run('manual'); await finish(service)
   assert.equal(service.state.runtime.community.lastResult.results[0].outcome, 'expired')
   assert.deepEqual(service.state.auth, auth)
   assert.equal(service.accountSummary().state, 'active')
   assert.equal(service.state.runtime.lastError, null)
 })
 
-test('server enforces disabled/empty/capability guards and uses the same execution lock as games', async (t) => {
-  const { service, calls } = setup(t)
-  service.config.community.enabled = false
-  assert.equal(service.runCommunity().error.code, 'community-disabled')
-  service.config.community.enabled = true
-  service.config.community.gids = []
-  assert.equal(service.runCommunity().error.code, 'community-empty')
-  service.config.community.gids = ['5']
+test('missing community credentials records only that item and never stops the game phase', async (t) => {
+  const { service, calls, checkin } = setup(t)
+  service.config.games.genshin = true
   delete service.state.auth.cookies.stoken
-  assert.equal(service.runCommunity().error.code, 'auth-unavailable')
   assert.equal(service.accountSummary().state, 'active')
-  service.state.auth.cookies.stoken = 'v2_secret-stoken'
-  delete service.state.auth.mid; delete service.state.auth.cookies.mid
-  assert.equal(service.statusPayload().community.capability.reason, 'missing-mid')
-  assert.equal(service.runCommunity().error.code, 'auth-unavailable')
-  service.state.auth.mid = 'secret-mid'
-  service.runPromise = Promise.resolve()
-  assert.equal(service.runCommunity().error.code, 'busy')
-  assert.equal(service.run('manual').error.code, 'busy')
-  service.runPromise = null
-  assert.equal(calls.length, 0)
+  assert.equal(service.statusPayload().community.capability.reason, 'no-stoken')
+  assert.equal((await checkin({ gameIds: ['genshin'], dabieye: true })).started, true)
+  await finish(service)
+  assert.deepEqual(calls.map(({ pathname }) => pathname), [rolePath, infoPath, gameSignPath])
+  assert.equal(service.state.runtime.lastResult.ok, true)
+  assert.equal(service.state.runtime.community.lastResult.results[0].outcome, 'auth-unavailable')
+  assert.equal(service.state.runtime.community.lastError.code, 'auth-unavailable')
 })
 
 test('logout during a POST discards old results, stops following requests, and clears account markers', async (t) => {
   const entered = deferred(), release = deferred()
-  const { service, calls } = setup(t, async ({ pathname }) => {
+  const { service, calls, checkin } = setup(t, async ({ pathname }) => {
     if (pathname === '/apihub/app/api/signIn') { entered.resolve(); await release.promise; return reply({ retcode: 0 }) }
   })
-  service.runCommunity()
+  assert.equal((await checkin({ gameIds: [], dabieye: true })).started, true)
   await entered.promise
   const done = service.runPromise
   const generation = service.authGeneration
@@ -178,16 +226,19 @@ test('logout during a POST discards old results, stops following requests, and c
   assert.equal(calls.length, 2)
 })
 
-test('closing community while first request is in flight prevents subsequent gid writes', async (t) => {
+test('closing community during balance preflight prevents the not-yet-sent write', async (t) => {
   const entered = deferred(), release = deferred()
-  const { service, posts } = setup(t, async ({ pathname }) => {
-    if (pathname === '/apihub/app/api/signIn') { entered.resolve(); await release.promise; return reply({ retcode: 0 }) }
+  const { service, calls, checkin } = setup(t, async ({ pathname }) => {
+    if (pathname === balancePath) { entered.resolve(); await release.promise }
   })
-  service.runCommunity(); await entered.promise
-  service.config.community.enabled = false
-  release.resolve(); await finish(service)
-  assert.equal(posts().length, 1)
-  assert.equal(service.state.runtime.community.lastResult.results[1].outcome, 'skipped')
+  assert.equal((await checkin({ gameIds: [], dabieye: true })).started, true)
+  await entered.promise
+  try {
+    assert.equal((await service.routeConfig(configWrite({ community: { enabled: false } }, service.statusPayload().configRevision))).ok, true)
+  } finally { release.resolve() }
+  await finish(service)
+  assert.deepEqual(calls.map(({ pathname }) => pathname), [balancePath])
+  assert.equal(service.state.runtime.community.lastResult.results[0].outcome, 'skipped')
 })
 
 test('late role lookup cannot write a cache or send a game sign after logout', async (t) => {
@@ -260,11 +311,12 @@ async function smsStart(service) {
 }
 for (const id of ['123', '456']) test(`new SMS login for ${id} invalidates old in-flight writes even on same-account login`, async (t) => {
   const entered = deferred(), release = deferred()
-  const { service, posts } = setup(t, async (call) => {
+  const { service, posts, checkin } = setup(t, async (call) => {
     if (call.pathname === '/apihub/app/api/signIn') { entered.resolve(); await release.promise; return reply({ retcode: 0 }) }
     return smsReply(call, id)
   })
-  service.runCommunity(); await entered.promise
+  assert.equal((await checkin({ gameIds: [], dabieye: true })).started, true)
+  await entered.promise
   const done = service.runPromise, generation = service.authGeneration
   try {
     const confirmation = await service.routeLoginSubmit(request('login/submit', { flowId: await smsStart(service), code: '123456' }))
@@ -276,6 +328,53 @@ for (const id of ['123', '456']) test(`new SMS login for ${id} invalidates old i
   assert.equal(service.state.runtime.community.lastResult, null)
   assert.deepEqual(service.state.runtime.community.signedDays, {})
   assert.equal(posts().length, 1)
+})
+
+for (const transition of ['logout', 'replace']) test(`combined manual run stops between phases after ${transition}`, async (t) => {
+  const between = deferred(), release = deferred()
+  const { service, posts, calls, checkin } = setup(t, (call) => smsReply(call, '456'))
+  service.config.games.genshin = true
+  // Pause after the real game phase has committed, before returning to the executor.
+  const execute = service.executeRun.bind(service)
+  service.executeRun = async (...args) => {
+    const result = await execute(...args)
+    between.resolve()
+    await release.promise
+    return result
+  }
+  assert.equal((await checkin({ gameIds: ['genshin'], dabieye: true })).started, true)
+  await between.promise
+  const done = service.runPromise
+  try {
+    assert.equal(service.state.runtime.lastResult.ok, true)
+    if (transition === 'logout') await service.routeLogout(request())
+    else {
+      const flowId = await smsStart(service)
+      const replacement = await service.routeLoginSubmit(request('login/submit', { flowId, code: '123456' }))
+      assert.equal(replacement.state, 'confirmed')
+      assert.equal(service.state.auth.aid, '456')
+    }
+    const callsAtRelease = calls.length
+    release.resolve()
+    await done
+    assert.equal(calls.length, callsAtRelease)
+    assert.equal(posts().length, 0)
+    assert.equal(service.state.runtime.lastResult, null)
+    assert.equal(service.state.runtime.community.lastResult, null)
+    assert.deepEqual(service.state.runtime.community.signedDays, {})
+    assert.equal(service.runPromise, null)
+  } finally { release.resolve() }
+})
+
+test('game credential expiry preserves independent Dabieye execution', async (t) => {
+  const { service, checkin, calls } = setup(t, ({ pathname }) => pathname === rolePath ? reply({ retcode: -100 }) : undefined)
+  service.config.games.genshin = true
+  assert.equal((await checkin({ gameIds: ['genshin'], dabieye: true })).started, true)
+  await finish(service)
+  assert.equal(service.state.runtime.lastResult.results[0].outcome, 'expired')
+  assert.equal(service.state.runtime.lastError.code, 'LOGIN_EXPIRED')
+  assert.equal(service.state.runtime.community.lastResult.ok, true)
+  assert.deepEqual(calls.map(({ pathname }) => pathname), [rolePath, balancePath, communitySignPath, balancePath])
 })
 
 test('old SMS confirmation cannot win while a new start request body is still being read', async (t) => {
@@ -304,39 +403,49 @@ test('old SMS confirmation cannot win while a new start request body is still be
 
 test('community run queries one account snapshot before and after writes, without attributing points', async (t) => {
   const { service, calls } = setup(t)
-  service.runCommunity(); await finish(service)
-  assert.deepEqual(calls.map(({ pathname }) => pathname), [balancePath, '/apihub/app/api/signIn', '/apihub/app/api/signIn', balancePath])
+  service.run('manual'); await finish(service)
+  assert.deepEqual(calls.map(({ pathname }) => pathname), [balancePath, communitySignPath, balancePath])
 })
 
-test('schedule can run community with all games off, consumes one actual attempt even on partial failure', async (t) => {
-  const { service, posts } = setup(t, ({ pathname, init }) => pathname === '/apihub/app/api/signIn' ? reply({ retcode: JSON.parse(init.body).gids === '5' ? 0 : -5003 }) : undefined)
+test('schedule can run community with all games off, consumes one actual attempt even on failure', async (t) => {
+  const { service, posts } = setup(t, ({ pathname }) => pathname === communitySignPath ? reply({ retcode: -5003 }) : undefined)
+  fixedClock(t, '2026-11-18T20:00:00Z')
   service.config.enabled = true
+  service.config.timezone = 'UTC'
   assert.equal(service.run('schedule').started, true); await finish(service)
-  assert.equal(posts().length, 2)
+  assert.equal(posts().length, 1)
   assert.equal(service.state.runtime.community.lastResult.reason, 'schedule')
   assert.equal(service.state.runtime.community.lastResult.ok, false)
-  assert.equal(service.state.runtime.scheduleLastAttemptDate, service.state.runtime.community.lastResult.day)
+  assert.equal(service.state.runtime.scheduleLastAttemptDate, '2026-11-18')
+  assert.equal(service.state.runtime.community.lastResult.day, '2026-11-19')
   assert.equal(service.state.runtime.lastResult, null)
   assert.equal(service.run('schedule').started, false)
-  assert.equal(posts().length, 2)
+  assert.equal(posts().length, 1)
 })
 
-test('busy schedule does not consume automatic opportunity; releasing the shared lock replans', async (t) => {
+for (const first of ['manual', 'schedule']) test(`shared lock rejects concurrent run starting after ${first}`, async (t) => {
   const entered = deferred(), release = deferred()
-  const { service } = setup(t, async ({ pathname }) => {
-    if (pathname === '/apihub/app/api/signIn') { entered.resolve(); await release.promise; return reply({ retcode: 0 }) }
+  const { service, checkin } = setup(t, async ({ pathname }) => {
+    if (pathname === communitySignPath) { entered.resolve(); await release.promise; return reply({ retcode: 0 }) }
   })
   service.config.enabled = true
-  service.config.games.genshin = true
-  service.runCommunity(); await entered.promise
+  const targets = { gameIds: [], dabieye: true }
+  const start = first === 'manual' ? await checkin(targets) : service.run('schedule')
+  assert.equal(start.started, true)
+  await entered.promise
   const done = service.runPromise
   try {
-    assert.equal(service.run('schedule').error.code, 'busy')
-    assert.equal(service.state.runtime.scheduleLastAttemptDate, null)
+    const second = first === 'manual' ? service.run('schedule') : await checkin(targets)
+    assert.equal(second.error?.code, 'busy')
+    if (first === 'manual') assert.equal(service.state.runtime.scheduleLastAttemptDate, null)
+    // There will be a future plan even if the first run completed the original targets.
+    service.config.games.genshin = true
   } finally { release.resolve(); await done }
   assert.ok(service.scheduler.getPlan())
-  assert.equal(service.run('schedule').started, true); await finish(service)
-  assert.ok(service.state.runtime.scheduleLastAttemptDate)
+  if (first === 'manual') {
+    assert.equal(service.run('schedule').started, true); await finish(service)
+    assert.ok(service.state.runtime.scheduleLastAttemptDate)
+  }
 })
 
 test('anonymous automatic skip consumes an attempt while no targets schedules nothing', async (t) => {
@@ -352,24 +461,29 @@ test('anonymous automatic skip consumes an attempt while no targets schedules no
 })
 
 for (const captcha of [false, true]) test(`combined run preserves independent scopes and applies global CAPTCHA stop=${captcha}`, async (t) => {
-  const { service, posts, calls } = setup(t, ({ pathname }) => pathname === '/event/luna/hk4e/sign' ? reply({ retcode: captcha ? 1034 : 999 }) : undefined)
+  const { service, posts, calls, checkin } = setup(t, ({ pathname }) => pathname === '/event/luna/hk4e/sign' ? reply({ retcode: captcha ? 1034 : 999 }) : undefined)
   service.config.enabled = true
   service.config.games.genshin = true
   if (captcha) service.config.games.starrail = true
-  service.run('schedule'); await finish(service)
+  assert.equal((await checkin({ gameIds: captcha ? ['genshin', 'starrail'] : ['genshin'], dabieye: true })).started, true)
+  await finish(service)
   assert.equal(service.state.runtime.lastResult.ok, false)
   if (captcha) assert.equal(service.state.runtime.lastResult.results.find((item) => item.game === 'starrail').outcome, 'skipped')
   assert.equal(service.state.runtime.community.lastResult.ok, !captcha)
-  assert.equal(posts().length, captcha ? 0 : 2)
+  assert.equal(posts().length, captcha ? 0 : 1)
+  assert.equal(service.state.runtime.scheduleLastAttemptDate, null)
+  assert.deepEqual(calls.map(({ pathname }) => pathname), captcha
+    ? [rolePath, infoPath, gameSignPath]
+    : [rolePath, infoPath, gameSignPath, balancePath, communitySignPath, balancePath])
   if (captcha) {
-    assert.deepEqual(service.state.runtime.community.lastResult.results.map((item) => item.outcome), ['skipped', 'skipped'])
+    assert.deepEqual(service.state.runtime.community.lastResult.results.map((item) => item.outcome), ['skipped'])
     assert.equal(calls.some(({ pathname }) => pathname === '/apihub/app/api/signIn'), false)
   }
 })
 
 for (const target of ['getCookieAccountInfoBySToken', 'getLTokenBySToken']) for (const retcode of [1034, -999]) {
   test(`game refresh CAPTCHA ${retcode} at ${target} stops remaining exchanges and all later writes`, async (t) => {
-    const { service, posts, calls } = setup(t, ({ pathname }) => {
+    const { service, posts, calls, checkin } = setup(t, ({ pathname }) => {
       if (pathname === '/event/luna/hk4e/sign') return reply({ retcode: -100 })
       if (pathname.endsWith(target)) return reply({ retcode, message: 'secret-stoken https://secret.invalid' })
       if (pathname.endsWith('getCookieAccountInfoBySToken')) return reply({ retcode: 0, data: { cookie_token: 'synthetic-derived-token' } })
@@ -379,7 +493,8 @@ for (const target of ['getCookieAccountInfoBySToken', 'getLTokenBySToken']) for 
     service.config.games.genshin = true
     service.config.games.starrail = true
     const originalAuth = structuredClone(service.state.auth)
-    service.run('schedule'); await finish(service)
+    assert.equal((await checkin({ gameIds: ['genshin', 'starrail'], dabieye: true })).started, true)
+    await finish(service)
     assert.equal(service.state.runtime.lastResult.results[0].outcome, 'captcha')
     assert.equal(service.state.runtime.lastError.code, 'CAPTCHA')
     assert.equal(service.state.runtime.lastResult.results[1].outcome, 'skipped')
@@ -387,7 +502,7 @@ for (const target of ['getCookieAccountInfoBySToken', 'getLTokenBySToken']) for 
     assert.equal(calls.filter(({ pathname }) => pathname.endsWith('/sign')).length, 1)
     assert.equal(calls.filter(({ pathname }) => pathname.startsWith('/account/auth/')).length, target === 'getCookieAccountInfoBySToken' ? 1 : 2)
     assert.equal(calls.some(({ pathname }) => pathname === balancePath), false)
-    assert.deepEqual(service.state.runtime.community.lastResult.results.map((item) => item.outcome), ['skipped', 'skipped'])
+    assert.deepEqual(service.state.runtime.community.lastResult.results.map((item) => item.outcome), ['skipped'])
     assert.deepEqual(service.state.auth, originalAuth)
     assert.doesNotMatch(JSON.stringify(service.statusPayload()), /secret-stoken|secret\.invalid/)
   })
@@ -431,20 +546,22 @@ test('unexpected community orchestration failure cannot replace the successful g
 test('completed community history is not overwritten by an automatic game failure', async (t) => {
   const { service, posts } = setup(t, ({ pathname }) => pathname === '/event/luna/hk4e/sign' ? reply({ retcode: 999 }) : undefined)
   service.config.enabled = true
+  service.run('manual'); await finish(service)
   service.config.games.genshin = true
-  service.runCommunity(); await finish(service)
   const historical = structuredClone(service.state.runtime.community)
   assert.equal(service.run('schedule').started, true); await finish(service)
   assert.deepEqual(service.state.runtime.community, historical)
   assert.equal(service.state.runtime.lastResult.ok, false)
-  assert.equal(posts().length, 2)
+  assert.equal(posts().length, 1)
 })
 
 test('a completed game scope is preserved when automatic opportunity is only needed for community', async (t) => {
   const { service, calls } = setup(t)
   service.config.enabled = true
   service.config.games.genshin = true
+  service.config.community.enabled = false
   service.run('manual'); await finish(service)
+  service.config.community.enabled = true
   const historical = structuredClone(service.state.runtime.lastResult)
   assert.equal(service.run('schedule').started, true); await finish(service)
   assert.deepEqual(service.state.runtime.lastResult, historical)
@@ -458,11 +575,12 @@ test('community recalculates the Shanghai request day instead of persisting one 
   Date.now = () => clock
   t.after(() => { Date.now = originalNow })
   const { service } = setup(t, ({ pathname }) => {
-    if (pathname === '/apihub/app/api/signIn') { clock = new Date('2026-11-18T16:00:01Z').getTime(); return reply({ retcode: 0 }) }
+    if (pathname === balancePath) clock = new Date('2026-11-18T16:00:01Z').getTime()
   })
-  service.runCommunity(); await finish(service)
-  assert.equal(service.state.runtime.community.signedDays['5'].day, '2026-11-18')
-  assert.equal(service.state.runtime.community.signedDays['2'].day, '2026-11-19')
+  service.run('manual'); await finish(service)
+  assert.equal(service.state.runtime.community.lastResult.day, '2026-11-18')
+  assert.deepEqual(Object.keys(service.state.runtime.community.signedDays), ['5'])
+  assert.equal(service.state.runtime.community.signedDays['5'].day, '2026-11-19')
   assert.equal(service.state.runtime.community.balance.day, '2026-11-19')
 })
 
@@ -475,4 +593,156 @@ test('a late profile response cannot repopulate an anonymous account', async (t)
   const profiling = service.enrichProfile(); await entered.promise
   await service.routeLogout(request()); release.resolve(); await profiling
   assert.equal(service.state.auth, null)
+})
+
+function fixedClock(t, value) {
+  const actual = Date.now
+  let clock = Date.parse(value)
+  Date.now = () => clock
+  t.after(() => { Date.now = actual })
+  return (value) => { clock = Date.parse(value) }
+}
+
+const configWrite = (config, configRevision) => request('config/checkin', { config, configRevision })
+
+test('a lost write survives reload and a failed manual retry; scheduled games still run, and next Shanghai day can write', async (t) => {
+  const clock = fixedClock(t, '2026-11-18T20:00:00Z')
+  let outcome = 'lost'
+  const { service, calls, posts, mount } = setup(t, ({ pathname }) => {
+    if (pathname !== communitySignPath) return
+    if (outcome === 'lost') throw new Error('synthetic response loss')
+    if (outcome === 'definite') return reply({ retcode: -5003 })
+  })
+  service.config.timezone = 'UTC'
+  service.config.enabled = true
+  service.run('manual'); await finish(service)
+  assert.equal(service.statusPayload().community.lastResult.results[0].outcome, 'unknown')
+  assert.equal(posts().length, 1)
+  outcome = 'definite'
+  service.run('manual'); await finish(service)
+  assert.equal(posts().length, 2)
+  service.config.games.genshin = true
+  service.dispose()
+  const restored = mount()
+  t.after(() => restored.dispose())
+  assert.equal(restored.run('schedule').started, true); await finish(restored)
+  assert.equal(calls.filter(({ pathname }) => pathname === gameSignPath).length, 1)
+  assert.equal(posts().length, 2, 'no automatic repeat after ambiguous dispatch and definite manual rejection')
+  assert.equal(restored.statusPayload().community.lastError.code, 'unknown')
+  assert.equal(restored.state.runtime.scheduleLastAttemptDate, '2026-11-18')
+  assert.deepEqual(restored.state.runtime.community.signedDays, {})
+  outcome = 'accepted'
+  clock('2026-11-19T20:00:00Z')
+  assert.equal(restored.run('schedule').started, true); await finish(restored)
+  assert.equal(posts().length, 3)
+  assert.equal(restored.statusPayload().community.lastResult.ok, true)
+  assert.equal(restored.statusPayload().community.uncertainAttempt, null)
+})
+
+test('community reservation is on disk when POST begins, and cannot block another account', async (t) => {
+  const entered = deferred(), release = deferred()
+  fixedClock(t, '2026-11-18T20:00:00Z')
+  const { service, home, posts } = setup(t, async ({ pathname }) => {
+    if (pathname === communitySignPath) { entered.resolve(); await release.promise; throw new Error('synthetic response loss') }
+  })
+  service.run('manual')
+  await entered.promise
+  try {
+    const raw = JSON.parse(fs.readFileSync(path.join(home, 'mys-checkin', 'state.json'), 'utf8'))
+    assert.equal(raw.runtime.community.accountId, '123')
+    assert.equal(raw.runtime.community.uncertainAttempt?.day, '2026-11-19')
+    assert.deepEqual(raw.runtime.community.signedDays, {})
+  } finally { release.resolve(); await finish(service) }
+  service.store.setAuth(syntheticAuth('456'))
+  service.config.enabled = true
+  assert.equal(service.run('schedule').started, true); await finish(service)
+  assert.equal(posts().length, 2)
+})
+
+// A directory at the temp-file path causes a real EISDIR without chmod/root dependence.
+function breakAtomicWrite(service) {
+  fs.mkdirSync(`${service.store.file}.${process.pid}.tmp`)
+}
+
+test('cannot dispatch a community write without a saved reservation', async (t) => {
+  const { service, posts } = setup(t)
+  breakAtomicWrite(service)
+  service.run('manual'); await finish(service)
+  assert.equal(posts().length, 0)
+  assert.equal(service.statusPayload().community.lastResult.ok, false)
+  assert.equal(service.statusPayload().community.lastError.code, 'save-failed')
+})
+
+test('failed atomic config save leaves persisted and effective config, schedule and revision off', async (t) => {
+  const { service, calls } = setup(t)
+  service.config.community.enabled = false
+  service.store.flush()
+  const previous = service.statusPayload()
+  const disk = fs.readFileSync(service.store.file, 'utf8')
+  breakAtomicWrite(service)
+  const answer = await service.routeConfig(configWrite({ enabled: true, community: { enabled: true } }, previous.configRevision))
+  assert.equal(answer.error?.code, 'save-failed')
+  const next = service.statusPayload()
+  assert.equal(next.configRevision, previous.configRevision)
+  assert.deepEqual(next.config, previous.config)
+  assert.deepEqual(next.schedule, previous.schedule)
+  assert.equal(fs.readFileSync(service.store.file, 'utf8'), disk)
+  assert.equal(service.run('schedule').started, false)
+  assert.equal((await service.routeCheckin(request('run/checkin', { gameIds: [], dabieye: true, accountRevision: next.accountRevision }))).started, false)
+  assert.deepEqual(calls, [])
+})
+
+test('config revision is a strict CAS on the new route; competing full draft cannot turn Dabieye back on', async (t) => {
+  const { service, routes, calls } = setup(t)
+  const before = service.statusPayload()
+  const a = { ...before.config, timezone: 'UTC' }
+  const b = { ...before.config, community: { ...before.config.community, enabled: false } }
+  const saved = await service.routeConfig(configWrite(b, before.configRevision))
+  assert.equal(saved.ok, true)
+  const stale = await service.routeConfig(configWrite(a, before.configRevision))
+  assert.equal(stale.error?.code, 'config-conflict')
+  assert.equal(routes.has('/api/mys/config'), false)
+  assert.deepEqual(routes.get('/api/mys/config/checkin')?.methods, ['POST'])
+  const after = service.statusPayload()
+  assert.equal(after.checkinProtocol, 1)
+  assert.notEqual(after.configRevision, before.configRevision)
+  assert.equal(after.config.community.enabled, false)
+  assert.equal(JSON.parse(fs.readFileSync(service.store.file, 'utf8')).config.community.enabled, false)
+  for (const body of [b, { config: b }, { config: [], configRevision: after.configRevision }, { config: b, configRevision: after.configRevision, extra: true }]) {
+    assert.equal((await service.routeConfig(request('config/checkin', body))).error?.code, 'bad-request')
+  }
+  assert.deepEqual(calls, [])
+})
+
+test('Host rejects an unseen same-target login replacement before dispatch', async (t) => {
+  const { service, calls } = setup(t, (call) => smsReply(call, '456'))
+  const first = service.statusPayload()
+  const sign = await service.routeLoginSubmit(request('login/submit', { flowId: await smsStart(service), code: '123456' }))
+  assert.equal(sign.state, 'confirmed')
+  const count = calls.length
+  const stale = await service.routeCheckin(request('run/checkin', { gameIds: [], dabieye: true, accountRevision: first.accountRevision }))
+  assert.equal(stale.error?.code, 'account-changed')
+  assert.equal(stale.started, false)
+  assert.equal(calls.length, count)
+  assert.notEqual(sign.status.accountRevision, first.accountRevision)
+  assert.match(sign.status.accountRevision, /^[0-9a-f-]{36}$/)
+  assert.equal((await service.routeCheckin(request('run/checkin', { gameIds: [], dabieye: true, accountRevision: sign.status.accountRevision }))).started, true)
+  await finish(service)
+})
+
+test('accepted manual retry resolves a same-day uncertainty and prevents another write', async (t) => {
+  fixedClock(t, '2026-11-18T20:00:00Z')
+  let lost = true
+  const { service, posts } = setup(t, ({ pathname }) => {
+    if (pathname === communitySignPath && lost) throw new Error('synthetic response loss')
+  })
+  service.run('manual'); await finish(service)
+  assert.equal(service.statusPayload().community.uncertainAttempt?.day, '2026-11-19')
+  lost = false
+  service.run('manual'); await finish(service)
+  assert.equal(service.statusPayload().community.uncertainAttempt, null)
+  assert.equal(service.statusPayload().community.lastResult.ok, true)
+  service.run('manual'); await finish(service)
+  assert.equal(posts().length, 2)
+  assert.equal(service.statusPayload().community.lastResult.results[0].outcome, 'cached-success')
 })
