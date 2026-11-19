@@ -11,8 +11,12 @@ const req = (action, body = {}, headers = {}) => new Request(`http://owner.inval
 const OLD = { aid: '123', stuid: '123', mid: 'old_mid', accountName: 'Existing', cookies: { ltoken: 'OLD_LTOKEN', cookie_token: 'OLD_COOKIE', stoken: 'OLD_STOKEN', stuid: '123', ltuid: '123', account_id: '123' } }
 function setup(t, options = {}) {
   process.env.DSH_HOME = fs.mkdtempSync(path.join(os.tmpdir(), 'dsh-sms-service-'))
+  if (options.savedConfig) {
+    const dir = path.join(process.env.DSH_HOME, 'mys-checkin')
+    fs.mkdirSync(dir); fs.writeFileSync(path.join(dir, 'state.json'), JSON.stringify({ config: options.savedConfig }))
+  }
   const routes = new Map(), calls = [], original = globalThis.fetch
-  const service = new MysService({ logger: () => ({ info() {}, warn() {} }), timeout: () => () => {}, connection: { fetch: { register(route) { routes.set(route.path, route); return () => routes.delete(route.path) } } } })
+  const service = new MysService({ logger: () => ({ info() {}, warn() {} }), timeout: () => () => {}, connection: { fetch: { register(route) { routes.set(route.path, route); return () => routes.delete(route.path) } } } }, options.entryConfig ?? {})
   service.config.enabled = false
   service.config.community.enabled = options.community ?? true
   service.store.setAuth(structuredClone(OLD))
@@ -46,6 +50,16 @@ async function begin(service) {
 async function complete(service) {
   return service.routeLoginSubmit(req('submit', { flowId: await begin(service), code: '123456' }))
 }
+
+test('legacy non-ASCII display metadata cannot stop service routes or SMS startup', async t => {
+  const { service, routes, calls } = setup(t, { savedConfig: { device: { name: 'Café', model: '本机' } } })
+  assert.ok(routes.has('/api/mys/status'))
+  await begin(service)
+  const sent = calls.find(c => c.path.endsWith('/createLoginCaptcha'))
+  assert.equal(sent.headers['x-rpc-device_name'], 'Café')
+  assert.equal(sent.headers['x-rpc-device_model'], 'Windows')
+  assert.equal(service.config.device.model, '本机')
+})
 
 test('SMS transport streams bounded bodies and accepts the admitted browser Host rather than the internal bridge URL', async (t) => {
   const { routes } = setup(t)
@@ -103,6 +117,9 @@ for (const [stage, bad] of [
   ['getCookieAccountInfoBySToken', () => success({ uid: '999', cookie_token: 'NEW_COOKIE' })],
   ['getUserGameRolesByCookie', () => response({ retcode: -100 })],
   ['getUserGameRolesByCookie', () => success({})],
+  ['getUserGameRolesByCookie', () => success({ list: [null] })],
+  ['getUserGameRolesByCookie', () => success({ list: [{ game_uid: 'bad', region: 'cn_gf01' }] })],
+  ['getUserMissionsState', () => success({ states: [null], total_points: 0, already_received_points: 0, can_get_points: 0 })],
   ['getUserGameRolesByCookie', () => response({ retcode: 0, data: { list: [] } }, 500)],
   ['getUserMissionsState', () => response({ retcode: -100 })],
   ['getUserMissionsState', () => success({})],

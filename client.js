@@ -162,7 +162,14 @@ window.__ModuleLoader__.load({
       smsFailed: "请求未完成。请检查状态后重试；若发送结果不明，请先等待短信，不会自动重发。",
       smsCooldown: "请等待倒计时结束后再发送。",
       smsRateLimited: "请求过于频繁，请稍后重新登录。",
-      smsExpired: "本轮登录已失效或无法继续，请取消后重新登录。",
+      smsOfficialAction: "账号需要官方实名、身份验证或恢复操作。请前往米游社官方客户端处理，再重新登录；插件无法代办。",
+      smsGameValidation: "新登录未保存：游戏凭据只读校验失败。已有登录未被替换，请取消后核对账号并重试。",
+      smsCommunityValidation: "新登录未保存：已启用社区的凭据只读校验失败。已有登录未被替换，请取消后核对账号与社区设置。",
+      smsOutcomeUnknown: "请求可能已经送达，但结果未确认。不会自动重试；请先等待短信或到官方客户端核对，不要立即重复发送。",
+      smsRejected: "官方接口明确拒绝了本次请求。不会自动重试；请取消后检查账号状态，必要时前往官方客户端处理。",
+      smsInvalidResponse: "官方响应格式不符合预期，本次未保存新登录。请取消后检查官方服务状态。",
+      smsNetwork: "未能完成官方接口的只读请求，本次未保存新登录。请检查网络后重试。",
+      smsExpired: "本轮登录已过期，请取消后重新登录。",
       smsCountdown: "{seconds} 秒后可重新发送",
       smsCodeSent: "短信已发送，请输入验证码。",
       smsVerification: "官方人工验证",
@@ -357,7 +364,14 @@ window.__ModuleLoader__.load({
       smsFailed: "The request did not complete. Check the state before retrying. If delivery is uncertain, wait for the SMS; it is never resent automatically.",
       smsCooldown: "Wait for the countdown before sending again.",
       smsRateLimited: "Too many requests. Please sign in again later.",
-      smsExpired: "This login expired or cannot continue. Cancel and start again.",
+      smsOfficialAction: "Official identity verification or account recovery is required. Use the official app, then start again; this plugin cannot perform it for you.",
+      smsGameValidation: "New login not saved: read-only game credential validation failed. Existing login unchanged. Cancel, check the account and try again.",
+      smsCommunityValidation: "New login not saved: required community credential validation failed. Existing login unchanged. Cancel and check the account and community settings.",
+      smsOutcomeUnknown: "The request may have arrived, but its result is unknown. No automatic retry. Wait for the SMS or check the official app; do not immediately send again.",
+      smsRejected: "The official API rejected this request. No automatic retry. Cancel and check the account in the official app if needed.",
+      smsInvalidResponse: "Unexpected official response. New login not saved. Cancel and check the official service status.",
+      smsNetwork: "The official read-only request could not complete. New login not saved. Check your network before retrying.",
+      smsExpired: "This login expired. Cancel and start again.",
       smsCountdown: "Resend available in {seconds}s",
       smsCodeSent: "SMS sent. Enter the verification code.",
       smsVerification: "Official manual verification",
@@ -831,7 +845,7 @@ window.__ModuleLoader__.load({
       let state = null, generation = 0, revision = 0, locked = false
       const publish = () => changed(state && { ...state })
       const cancelId = (flowId) => { if (flowId) void request('login/cancel', { flowId }).catch(() => {}) }
-      const errorKey = (code) => ({ 'sms-code-invalid': 'smsWrongCode', 'sms-cooldown': 'smsCooldown', 'flow-expired': 'smsExpired', 'flow-changed': 'smsExpired', 'rate-limited': 'smsRateLimited', 'challenge-expired': 'smsExpired' })[code] ?? 'smsFailed'
+      const errorKey = (code) => ({ 'sms-code-invalid': 'smsWrongCode', 'sms-cooldown': 'smsCooldown', 'flow-expired': 'smsExpired', 'flow-changed': 'smsExpired', 'rate-limited': 'smsRateLimited', 'challenge-expired': 'smsExpired', 'official-action-required': 'smsOfficialAction', 'game-validation-failed': 'smsGameValidation', 'community-validation-failed': 'smsCommunityValidation', 'outcome-unknown': 'smsOutcomeUnknown', 'upstream-rejected': 'smsRejected', 'invalid-response': 'smsInvalidResponse', 'network-error': 'smsNetwork' })[code] ?? 'smsFailed'
       const accept = (data) => {
         if (data.state === 'confirmed' && data.ok === true) {
           generation++; revision++; locked = false; state = null; publish(); confirmed(data); return
@@ -839,7 +853,8 @@ window.__ModuleLoader__.load({
         if (data.flow && state.flow && data.flow.flowId !== state.flow.flowId) {
           state.challenge = null; state.error = 'smsExpired'; return
         }
-        if (data.flow) state.flow = data.flow
+        if (Object.hasOwn(data, 'flow')) state.flow = data.flow
+        if (data.ok === false && (data.flow === null || ['official-action-required', 'game-validation-failed', 'community-validation-failed'].includes(data.error?.code))) state.fatal = true
         state.challenge = data.challenge ?? (state.challenge?.challengeId === data.flow?.challenge?.challengeId ? state.challenge : null)
         state.error = data.ok === false ? errorKey(data.error?.code) : null
       }
@@ -998,18 +1013,30 @@ window.__ModuleLoader__.load({
       useEffect(() => {
         const previous = document.activeElement
         const root = dialog.current
-        root?.querySelector('input,button')?.focus()
+        root?.querySelector('input:not(:disabled),button:not(:disabled):not([hidden])')?.focus()
+        // Focus events leaving an iframe reach the parent document. A document
+        // guard also covers controls that become disabled during a request;
+        // aria-modal and a bubbling keydown trap alone cannot contain those.
+        const containFocus = event => { if (root && !root.contains(event.target)) root.focus() }
+        document.addEventListener('focusin', containFocus, true)
         const timer = setInterval(() => setNow(Date.now()), 1000)
-        return () => { clearInterval(timer); previous?.focus?.() }
+        return () => { document.removeEventListener('focusin', containFocus, true); clearInterval(timer); previous?.focus?.() }
       }, [])
       const flow = session.flow
       const seconds = Math.max(0, Math.ceil(((flow?.resendAt ?? 0) - now) / 1000))
       const terminal = session.fatal || (flow && (['error', 'expired', 'candidate-ready'].includes(flow.status) || flow.expiresAt <= now))
       const disabled = session.busy || flow?.busy || terminal || !!session.challenge
       const codeReady = flow?.status === 'code-sent'
+      useEffect(() => {
+        const root = dialog.current
+        if (!root) return
+        const active = document.activeElement
+        if (!root.contains(active) || active?.disabled) root.focus()
+        if (!disabled && codeReady && document.activeElement === root) root.querySelector('input[autocomplete="one-time-code"]:not(:disabled)')?.focus()
+      }, [disabled, codeReady, session.error, !!flow])
       const onSubmit = (event) => { event.preventDefault(); if (!disabled) void (codeReady ? controller.submit() : controller.send()) }
       return h('div', { className: 'mys-overlay', role: 'presentation', onClick: event => { if (event.target === event.currentTarget) controller.cancel() } },
-        h('div', { className: 'mys-dialog', ref: dialog, role: 'dialog', 'aria-modal': true, 'aria-label': t('smsTitle'), 'aria-busy': session.busy,
+        h('div', { className: 'mys-dialog', ref: dialog, role: 'dialog', tabIndex: -1, 'aria-modal': true, 'aria-label': t('smsTitle'), 'aria-busy': session.busy,
           onKeyDown: event => {
             if (event.key === 'Escape') { event.preventDefault(); close.current(); return }
             if (event.key !== 'Tab') return
@@ -1026,7 +1053,8 @@ window.__ModuleLoader__.load({
             flow ? h('label', { className: 'mys-field' }, t('smsCode'), h('input', { className: 'mys-input', type: 'text', inputMode: 'numeric', autoComplete: 'one-time-code', maxLength: 6, value: session.code,
               disabled: !codeReady || disabled, onChange: event => controller.setCode(event.target.value) })) : null,
             session.error ? h('div', { className: 'mys-banner', role: 'alert', 'data-tone': 'warn' }, t(session.error)) : null,
-            h('div', { role: 'status', 'aria-live': 'polite', className: 'mys-hint' }, session.busy ? t('smsBusy') : terminal ? t('smsExpired') : seconds > 0 ? fill(t('smsCountdown'), { seconds }) : codeReady ? t('smsCodeSent') : ''),
+            h('div', { role: 'status', 'aria-live': 'polite', className: 'mys-hint' }, session.busy ? t('smsBusy') : session.error ? '' : terminal ? t('smsExpired') : codeReady ? t('smsCodeSent') : ''),
+            seconds > 0 ? h('div', { className: 'mys-hint', 'aria-live': 'off' }, fill(t('smsCountdown'), { seconds })) : null,
             session.challenge ? h(CaptchaFrame, { key: session.challenge.challengeId, t, challenge: session.challenge, onResult: controller.solve, onError: controller.widgetError }) : null,
             h('div', { className: 'mys-dialog-foot' },
               h(Button, { type: 'button', variant: 'primary', disabled: !!disabled || (!codeReady && seconds > 0), onClick: () => { if (!disabled) void (codeReady ? controller.submit() : controller.send()) } }, t(codeReady ? 'smsSubmit' : 'smsSend')),

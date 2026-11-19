@@ -29,6 +29,7 @@ test('SMS dialog describes labeled native phone/code inputs, explicit actions an
   }
   const base = { phone: '', code: '', flow: null, busy: false, error: null }
   let nodes = describe(base)
+  assert.equal(nodes.find(n => n.props.role === 'dialog').props.tabIndex, -1)
   const tel = nodes.find(n => n.type === 'input')
   assert.equal(tel.props.autoComplete, 'tel-national'); assert.equal(tel.props.inputMode, 'tel')
   assert.ok(nodes.some(n => n.type === 'label' && n.props.children[0] === 'smsPhone'))
@@ -40,6 +41,9 @@ test('SMS dialog describes labeled native phone/code inputs, explicit actions an
   assert.ok(nodes.some(n => n.props.role === 'alert' && n.props.children[0] === 'smsWrongCode'))
   nodes.find(n => n.type === 'form').props.onSubmit({ preventDefault() {} }); assert.equal(calls.at(-1), 'submit')
   nodes.find(n => n.props.role === 'dialog').props.onKeyDown({ key: 'Escape', preventDefault() {} }); assert.equal(calls.at(-1), 'cancel')
+  nodes = describe({ ...base, flow: flow({ expiresAt: Date.now() + 300000, resendAt: Date.now() + 60000 }) })
+  assert.equal(nodes.find(n => n.props.role === 'status').props.children[0], 'smsCodeSent')
+  assert.ok(nodes.some(n => n.props['aria-live'] === 'off'))
   nodes = describe({ ...base, busy: true }); const before = calls.length
   nodes.find(n => n.type === 'form').props.onSubmit({ preventDefault() {} }); assert.equal(calls.length, before)
 })
@@ -87,6 +91,14 @@ test('state read is GET-only and never replays a challenge; stale challenge succ
   h.c.cancel(); const count = h.calls.length
   await h.c.solve('host-one', proof)
   assert.equal(h.calls.length, count)
+})
+
+for (const [code, key] of [['official-action-required', 'smsOfficialAction'], ['game-validation-failed', 'smsGameValidation'], ['community-validation-failed', 'smsCommunityValidation'], ['outcome-unknown', 'smsOutcomeUnknown'], ['upstream-rejected', 'smsRejected']]) test(`safe ${code} recovery category and null host flow cannot retain a stale checkpoint`, async () => {
+  const h = harness(async path => path.endsWith('submit') ? { ok: false, flow: null, error: { code, message: 'SECRET' } } : { ok: true, flow: flow() })
+  h.c.open(); h.c.setPhone('13800138000'); await h.c.send(); h.c.setCode('123456'); await h.c.submit()
+  assert.equal(h.view().error, key); assert.equal(h.view().flow, null); assert.equal(h.view().fatal, true)
+  const before = h.calls.length; await h.c.send(); assert.equal(h.calls.length, before)
+  assert.equal(JSON.stringify(h.view()).includes('SECRET'), false)
 })
 
 test('widget loading failure invalidates its rendering checkpoint and cannot continue or resend', async () => {

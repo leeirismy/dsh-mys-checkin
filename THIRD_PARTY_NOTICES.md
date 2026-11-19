@@ -1,5 +1,25 @@
 # Third-party notices
 
+## SMS protocol references and official CAPTCHA
+
+The SMS implementation independently follows publicly visible mainland app
+endpoints/field contracts, with protocol research reference to
+[IKUNHEIHIE/miyoushe-checkin](https://github.com/IKUNHEIHIE/miyoushe-checkin),
+notably its backend upstream.ts. Its license has not been verified here;
+this notice does not assert a license grant for that project, and no upstream
+backend or service is bundled/executed by this plugin.
+Reference source SHA256: `332a0b145b524a334d7aef42c54a04d26b574442f0bf7dde559e1962d16c973d`.
+
+Official Geetest GT4/GT3 loaders are requested at runtime, only for manual
+verification inside an opaque sandbox:
+- https://static.geetest.com/v4/gt4.js
+- https://static.geetest.com/static/tools/gt.js
+
+They are not vendored or redistributed under this plugin's MIT license.
+Their own provider terms and availability apply. No CAPTCHA-solving service,
+bypass, third-party SDK account agent, or QR renderer is included.
+
+
 ## MihoyoBBSTools
 
 Community endpoint headers, constants, and account balance field mapping in

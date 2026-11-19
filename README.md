@@ -3,176 +3,91 @@
 [![CI](https://github.com/Veersion/dsh-mys-checkin/actions/workflows/ci.yml/badge.svg)](https://github.com/Veersion/dsh-mys-checkin/actions/workflows/ci.yml)
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-在 [DSH](https://github.com/deepseek-ai) 左侧栏新增一个「米游社签到」任务面板：扫码登录米哈游账号，每天在你设定的时间窗口内**随机挑一个时刻**，为已绑定的米哈游游戏自动签到。登录失效、触发人机验证或签到失败时，面板和界面顶部都会给出提示。
+在 DSH 左侧栏提供「米游社签到」面板：**中国大陆 +86 短信登录**、游戏每日签到、可选米游币社区签到、随机时间窗口与失败提示。单账号，Node >=22，ESM，零运行时依赖。
 
-> A DSH plugin that adds a **米游社 (Miyoushe)** task panel to the sidebar: QR-code login, one randomized daily check-in per game, and in-UI alerts when the session expires or the check-in fails. Zero runtime dependencies — Node built-ins only.
+> Mainland +86 SMS login, manually operated official CAPTCHA, independent game/community check-in. This branch has offline tests only, not live account or GUI acceptance.
 
-- 可选社区签到：默认关闭，默认分区为大别野与原神；启用后共用原有时间窗口。只签到，不看帖、点赞、分享或解验证码。
-- 支持游戏：原神、崩坏：星穹铁道、绝区零、崩坏3、未定事件簿、崩坏学园2
-- 宿主侧完成全部网络请求与定时；浏览器侧只渲染面板，**Cookie 不会经过浏览器**
-- 所有设置都在这个面板里，DSH 设置页不再新增分区
-- 零运行时依赖（只用 Node 内置模块），不需要 pnpm 安装任何包
+**本分支未安装、未重载，也未请求真实短信或账号接口。** 官方 GT3/GT4 在不透明 sandbox 中的实际兼容性、当前 DSH Desktop/Web 载体及浅深色视觉效果仍需授权后验收。测试通过不代表线上协议一定可用，不承诺永久登录或规避风控。
 
-## 安装
+## 安装与集成边界
 
-先克隆到任意目录：
+普通安装需要在目标 profile 中同时配置：
+1. `node_modules/@local/dsh-mys-checkin` 链接到插件目录；
+2. profile 的 `package.json` 的 `dependencies` 添加 `"@local/dsh-mys-checkin": "link:<绝对路径>"`；
+3. `dsh.profile.bundles` 包含 `"@local/dsh-mys-checkin"`。
 
-```powershell
-git clone https://github.com/Veersion/dsh-mys-checkin.git
-```
+**当前隔离分支不是已安装目录。不要将验证工作区直接当作已上线版本。** 集成 installed main、修改 profile、安装与重载均须另行确认。源码修改不保证热更新；不要启动替代 Web 服务冒充现有 GUI。卸载时先禁用 bundle 并移除依赖/链接；清理保存凭据是单独且不可逆的操作，请自行备份后确认。
 
-安装由 DSH 的 profile 完成（下面以 `desktop` profile 为例），三件事缺一不可：
+本次从 `e988b41` 重建 `feat/sms-login`，不包含此前整段 9 条 SDK/诊断提交。旧引用保留：
+- `backup/pre-sms-installed-20261118` → `564c1413183b2baa03f254cf6fce9b4118998683`
+- `backup/pre-sms-sdk-diagnostics-20261118` → `ad38225193cea723b992331cf7114d05cc608402`
+- `backup/pre-sms-stash-20261118` → `fe5e97439d98490356a3200514d2773989acf579`
 
-1. `~/.dsh/profiles/desktop/node_modules/@local/dsh-mys-checkin` 指向克隆出来的目录（符号链接/目录联接）；
-2. profile 的 `package.json` 里 `dependencies` 增加 `"@local/dsh-mys-checkin": "link:<克隆目录的绝对路径>"`；
-3. 同一文件的 `dsh.profile.bundles` 数组里增加 `"@local/dsh-mys-checkin"`（**只有列进 bundles 才会被启用**）。
+尚未移动 installed main，也未应用/删除旧 stash 备份。将来若选择回退，应恢复已安装代码与加载版本；Git 备份**不包含账号状态**，不能恢复后来删除的凭据。
 
-> 只写 `dependencies` 不写 `bundles` 是最常见的「装了但没生效」原因。
+## 使用：短信登录
 
-配置变更可能触发宿主重新组合，但**不保证源码修改自动热更新**。宿主源码需要重载插件；浏览器源码需要当前安装对应的客户端构建流程和页面刷新。不要启动另一个 Web 服务来替代正在使用的 GUI。
+1. 在左侧打开「米游社签到」，点击「短信登录」。打开对话框本身不请求短信。
+2. 输入 11 位大陆手机号，明确点击「发送验证码」。仅支持 +86，不支持海外号或多账号管理。
+3. 如出现官方人工验证，在对话框里亲自完成 GT4/GT3。插件不自动解题、不绕过验证。加载失败/过期后请取消并重新开始，不会自动重发。
+4. 输入 6 位短信验证码并点击「验证并登录」，也可按 Enter。错误码可显式重试；重新发送至少间隔 60 秒，每轮最多提交 5 次验证码。
+5. 新凭据先换取 SToken 派生凭据并做只读校验：角色列表允许合法空列表；**社区启用时，社区只读校验也必须通过**。社区关闭时，该校验失败只显示警告。昵称查询失败不决定登录成败。通过后才整体替换旧登录，失败/取消不覆盖旧账号。
+6. 本轮最长 5 分钟，人工验证不超过 2 分钟；取消/Escape/关闭会清理本轮输入并撤销会话。已发出的请求不一定能撤回，结果不明时先等待短信，不会自动重试发送。
 
-**卸载**：把上面两处条目和链接删掉，重启 DSH；再删除 `~/.dsh/mys-checkin/`（里面有登录凭据）。
+账号卡「删除登录」需二次确认，会删除保存凭据并清理账号缓存。SToken 可能失效；自动派生 ltoken/cookie_token 不会续期 SToken 本身。缺失或失效时需要重新短信登录。已有合法保存凭据不强制重新登录。
 
-## 使用
+### 隐私边界
 
-### 1. 打开面板
+- 手机号、验证码与人工验证 proof 仅用于本轮内存状态，不写入日志、持久化状态、浏览器存储或 URL。关闭、完成或到期会清理持有引用；**不保证 JavaScript 堆内存的物理擦除**。
+- 手机号与 +86 字段用协议要求的 RSA PKCS#1 v1.5 加密后发给米哈游；验证码通过 HTTPS 发送。运行 DSH 的本机与同权限进程仍在信任边界内。
+- 登录 Cookie/SToken 仅宿主持有，不返回浏览器；官方验证码渲染配置中的临时会话数据只向本轮 owner/隔离 frame 提供，不是状态查询字段。第三方官方 widget 会访问其官方 geetest/geevisit 资源，不能保证第三方服务本身零追踪。
+- 既有状态文件 `~/.dsh/mys-checkin/state.json` **仍以明文保存长期凭据**，并非系统钥匙串。本次未升级存储加密；系统管理员、同权限进程和备份可能读取。请保护本机与备份，必要时使用加密卷。
 
-左侧栏「自动化任务」旁边有一个同级的「米游社签到」面板（圆圈对勾图标）。任务由宿主后台调度器执行，不依赖某个会话是否打开，也不消耗模型 token。
+## 游戏、社区与调度
 
-> 为什么不是直接长在「自动化任务」页面里：DSH 那个页面只托管**会话提醒**（到点向某个会话投递提示词，由模型继续处理），没有给第三方插件留页面内插槽，也不能调度后台命令。所以签到做成同级面板，执行与可靠性由插件后台调度器保证。
+支持原神、星穹铁道、绝区零、崩坏3、未定事件簿、崩坏学园2国服。只为勾选且有角色的游戏签到。
 
-### 2. 登录
+- 默认时间窗口 `18:00–18:30`，最多 4 个，在窗口内随机安排；开始不早于结束时，结束自动改为开始 +1 分钟。默认错过窗口后延迟 3–10 分钟补跑，可关闭。
+- 社区默认关闭，分区默认大别野（5）与原神（2）；可选 1/2/3/4/5/6/8，清空不会恢复默认。仅签到，不看帖、点赞、分享、发帖。
+- 「立即游戏签到」与「立即社区签到」分别执行；同一实例共用互斥锁。总定时开关不禁止手动游戏签到；社区开关同时禁止社区手动写操作。游戏全关而社区启用时，社区仍可定时运行。
+- 社区需要完整 SToken 及对应账号标识，V2 还需要 mid；缺少社区凭据不会删除游戏登录。社区 Cookie 与游戏凭据分开构造。
+- 自动尝试每日最多一次；只完成一个手动范围不会吞掉另一个范围机会。社区成功记录按 Asia/Shanghai 自然日去重，定时机会按配置时区计算。忙碌不消耗机会；没有跨进程锁，请勿在多个 DSH 实例并行运行同一账号。
+- 「接口接受」不等于独立确认米游币到账。米游币仅为账号快照，不计算本次赚取或承诺每日上限；旧日期/失败快照标为历史。写请求响应丢失标记结果不明，同轮不重发，先去 App 核对。
+- 签到遭遇验证码时停止剩余写操作，请去 App 处理；**对话框内人工验证仅覆盖短信登录**，不自动恢复已停止的签到任务。
+- 设备 ID 持久保存；各端点版本/签名单独配置。游戏间随机 2–8 秒。仅明确会话失效时尝试派生刷新一次，不做定期续期。服务端风控策略变化时仍可能失败，不要频繁登录/补签。
 
-在面板顶部点「扫码登录」，用米游社 App 右上角「扫一扫」扫描二维码并在手机上确认。
+面板显示账号、每游戏/社区结果、任务摘要、最近 200 条日志及顶部失败提示。日志和展示不包含 Cookie、短信验证码、手机号或 proof。`检测接口与登录` 会请求只读绑定接口，不是无网络自检。
 
-- 二维码只在本机生成，不上传到任何第三方；
-- 若浏览器支持 `BarcodeDetector`，对话框会顺带做一次「二维码自检」，识别失败会提示刷新；
-- 登录成功后状态变为「已登录」，并显示昵称与 UID；
-- 登录优先走 **App 扫码通道**：服务端会在二维码里请求 SToken，确认后插件用 SToken 换取 `ltoken` 与 `cookie_token`，这样登录过期时才能自动续期。只有 App 通道创建二维码失败时，才退回网页通道；网页凭据可以进行游戏签到，但**不含 SToken，无法进行社区签到或派生续期游戏凭据**，面板会明确提示并提供重新扫码入口。
-- 换到的 `ltoken` 是 V1 令牌，会和 `ltuid` / `account_id` 配对；插件会自动补齐这些 ID Cookie，避免出现「能查角色、签到却报 -100」。
-- 0.2.1 会自动修复 0.2.0 存下的登录凭据，不需要重新扫码；更早的网页凭据仍建议重新扫码。
-- 账号卡上的「删除登录」需要点击两次确认，会清空本机保存的凭据、错误提示与角色缓存。
+## 协议与实现
 
-登录凭据保存在 `~/.dsh/mys-checkin/state.json`（**明文**，仅本机可读）。共享电脑上请注意这一点。
-
-### 3. 自动签到
-
-- **时间窗口**：默认 `18:00–18:30`，可增删（最多 4 个）。每天只执行一次，实际时刻在窗口内均匀随机。
-- **窗口编辑规则**：开始时间晚于（或等于）结束时间时，结束时间自动变成「开始 + 1 分钟」，不会拒绝保存；多个窗口允许相同时间（调度器取第一个尚未结束的窗口）；「添加窗口」会在上一个窗口基础上后移 1 小时，方便直接微调。
-- **错过窗口后补跑**：若 DSH 在窗口结束后才启动、且当天还没签过，会在 3–10 分钟内随机补跑一次。可关闭。
-- **游戏**：只给勾选的游戏签到；没有角色的游戏会自动跳过并记录。
-- **任务操作**：页头的「立即运行」「暂停 / 启用」，以及任务卡片里的状态、频率、下次运行、上次运行摘要。
-- **运行结果**：顶部是汇总卡（今日签到账号数、是否自动签到、签到时间、`已完成/总数`），下面每个游戏一张卡，列出 UID、签到状态、今日奖励、累计签到天数。
-- **运行日志**：最近 200 条。
-
-账号区显示的是**米游社昵称 + 纯数字米游社 UID**（来自 `ltuid`），并尽量加载社区头像；不再显示 `mid` 这类内部标识。
-
-### 4. 社区签到与米游币
-
-- 在独立的「社区签到 · 米游币」卡片里主动打开开关。默认选中大别野（5）与原神（2），可多选 1/2/3/4/5/6/8 七个分区。清空选择会明确提示，**不会偷偷恢复默认分区**。
-- 「立即游戏签到」只运行游戏；「立即社区签到」只运行选中分区。保存未生效、缺凭据或已有任务运行时，社区按钮不可用。两个范围共用一把锁。
-- 总定时开关只控制自动运行；社区开关还会禁止社区手动写操作。所有游戏关闭时，只要社区启用且有选择，仍可随原时间窗口自动运行。
-- 社区需要 SToken：V1 要有数字账号 ID，V2 还要有 mid。App 扫码可以获得 SToken；网页登录回退不具备社区能力。缺少或失效的社区凭据**不会删除游戏登录**。所谓「续期凭据」只用 SToken 派生 ltoken/cookie_token，不会续期 SToken 本身；SToken 失效需要重新 App 扫码。
-- 每个分区显示接口接受、本机今日记录、失败、待人工验证、结果不明或未执行。「接口接受」不等于已独立验证积分到账。请求已发但响应丢失会标记结果不明，**同轮不重发**；先去 App 核对，再决定是否手动重试。
-- 米游币信息只表示账号查询快照：余额、快照当日已获/剩余与查询时间。旧日期或查询失败时标为历史快照；不计算「本次赚取」，不承诺固定每日上限，不用任务 58 或剩余积分推断某个分区已签到。正常运行会在签到前后各查询一次；遇到验证码或会话失效等安全停止条件，不再继续请求。
-- 社区成功记录按 **Asia/Shanghai** 自然日去重，定时机会按你配置的时区计算。自动任务真正开始尝试后，当日不自动反复补失败；忙碌不消耗机会。只完成一个手动范围不会吞掉另一范围的自动机会。
-- 验证码必须在 App 手动处理；检测到验证码后，本轮尚未执行的游戏/社区写请求全部停止，不做绕过。退出、换号、同账号重新登录会清理账号相关结果和日标记，旧异步回调不得写回。
-
-### 5. 提示与排错
-
-- 面板顶部横幅：登录失效 → 提供「重新扫码」；人机验证 → 说明如何处理；其它失败 → 「重试签到」。
-- 界面顶部小药丸（`shell.overlay`）：只要存在未清除的失败状态就会显示，可点 × 关闭当次提示。
-- 「检测接口与登录」会实际请求一次绑定接口，报告网络是否可达、登录是否有效、耗时多少。
-- 「运行日志」保留最近 200 条。
-
-## 请求节制与风控边界
-
-「用一段时间就失效」基本都不是签名问题，而是设备指纹与凭据刷新链的问题。插件按下面的原则实现：
-
-| 措施 | 实现 |
+| 环节 | 官方端点 |
 | --- | --- |
-| 设备 ID 持久化 | 首次运行生成 UUID 并写入状态文件，**之后永不改变**；请勿删除 `state.json`，否则等同换机 |
-| 签名与版本一致 | 各端点的 DS 与版本保持对应；社区使用独立 client 配置，不覆盖游戏参数 |
-| 每日一次 | 自动尝试每日最多一次；手动只有全部已启用范围明确完成才抑制自动机会，社区按分区本机成功记录去重 |
-| 随机间隔 | 游戏之间随机 2–8 秒；定时时刻在窗口内均匀随机，不会整点触发 |
-| 绑定查询缓存 | `getUserGameRolesByCookie` 每个游戏每天最多一次 |
-| 续期克制 | 只有服务端返回 `-100/-111/10001` 时才用 stoken 换一次 cookie_token，并只重试一次；不做定时刷新 |
-| 风控即停 | 游戏验证码 `1034/-999` 或社区验证码 `1034` 停止本轮剩余写请求并提示；普通单范围错误与另一范围隔离 |
-| 真实请求头 | 完整的 `x-rpc-*` 设备头、`Origin/Referer`、移动端 UA，随版本号统一 |
+| 发短信 | `POST passport-api.mihoyo.com/account/ma-cn-verifier/verifier/createLoginCaptcha` |
+| 验证码登录 | `POST passport-api.mihoyo.com/account/ma-cn-passport/app/loginByMobileCaptcha` |
+| 派生凭据 | `GET passport-api.mihoyo.com/account/auth/api/getLTokenBySToken`、`getCookieAccountInfoBySToken` |
+| 角色校验 | `GET api-takumi.mihoyo.com/binding/api/getUserGameRolesByCookie` |
+| 游戏签到 | `POST api-takumi.mihoyo.com/event/luna/{game}/sign`；绝区零使用 `act-nap-api.mihoyo.com` |
+| 社区签到 | `POST bbs-api.miyoushe.com/apihub/app/api/signIn`，精确 JSON 字节参与 DS2 签名，零自动重试 |
+| 米游币快照 | `GET bbs-api.miyoushe.com/apihub/wapi/getUserMissionsState?point_sn=myb` |
 
-仍无法完全避免风控：米游社的验证码与设备指纹策略会变化。**不要**在同一台机器上用同一个 DSH 频繁登录多个账号，也不要在短时间内反复手动补签。
+短信使用 app `2.116.0`、client_type `2`、app ID `bll8iq97cem8`；社区默认 app `2.117.0`，游戏 `2.109.0`。参数源于公开参考协议，**不是线上兼容性实测保证**。游戏高级参数仍可配置；社区 Host 配置保持独立。
 
-## 协议实现说明
+主要模块：[短信协议](lib/sms-login.js)、[本轮状态机](lib/sms-flow.js)、[宿主服务](lib/service.js)、[隔离验证文档](lib/captcha-frame.js)、[游戏协议](lib/mys.js)、[社区协议](lib/community.js)、[调度](lib/scheduler.js)、[浏览器面板](client.js)。QR 路由、轮询、渲染器及专属配置已移除；历史 changelog/design 保留原有语境。
 
-| 环节 | 接口 |
-| --- | --- |
-| 扫码创建/轮询 | 优先 `POST passport-api.mihoyo.com/account/ma-cn-passport/app/createQRLogin` 与 `/app/queryQRLoginStatus`（`token_types=1`，返回 SToken）；失败时退回 `passport-api.miyoushe.com/.../web/...` |
-| 凭据续期 | `GET passport-api.mihoyo.com/account/auth/api/getCookieAccountInfoBySToken`、`getLTokenBySToken`（登录阶段也会用 SToken 补齐 ltoken/cookie_token） |
-| 角色列表 | `GET api-takumi.mihoyo.com/binding/api/getUserGameRolesByCookie?game_biz=…` |
-| 今日状态 | `GET …/event/luna/{game}/info?act_id&region&uid` → `is_sign`、`total_sign_day`、`first_bind`（用于「累计签到」并在已签到时跳过签到请求） |
-| 账号昵称 | `GET bbs-api.miyoushe.com/user/api/getUserFullInfo?uid=<ltuid>`（DS2 签名；失败时回退为游戏内昵称） |
-| 签到 | `POST https://api-takumi.mihoyo.com/event/luna/{game}/sign`（绝区零用 `act-nap-api.mihoyo.com`） |
-| 社区签到 | `POST bbs-api.miyoushe.com/apihub/app/api/signIn`，精确字符串 gid 的 JSON body，与 DS2 使用同一字节串；写请求零自动重试 |
-| 米游币快照 | `GET bbs-api.miyoushe.com/apihub/wapi/getUserMissionsState?point_sn=myb`，普通 Cookie、无 DS |
-| 签名 | DS1：`md5("salt=<salt>&t=<t>&r=<6位随机>")` → `"<t>,<r>,<md5>"`；BBS 接口用 DS2（盐 `t0qEgfub…`，含 body/query） |
-
-社区默认兼容参数：App `2.117.0`、DS2 salt `t0qEgfub6cvueAPgR5m9aQWWVciEer7v`；可在 Host 的 `community.client.appVersion/salt` 覆盖，首版不新增高级 UI。参数源自参考代码，**不是当前线上协议兼容性的实测保证**。
-
-游戏默认参数：`x-rpc-app_version = 2.109.0`，`salt = d9200c846b10886e8c874fc33c8f308b`。**米哈游更新客户端后这两项可能都要换**，可在「高级设置」里修改，无需改代码。
-
-## 目录结构
-
-```
-.
-  index.js             宿主插件入口（注册服务）
-  client.js            浏览器 bundle（侧边栏任务面板 + 顶部提示）
-  cordis.patch.yml     把插件插入 profile 配置树的 bundle patch
-  lib/config.js        配置默认值、游戏表、校验
-  lib/store.js         状态文件（原子写、迁移、日志环）
-  lib/ds.js            DS 签名、请求头、Cookie 解析
-  lib/http.js          带超时与重试的请求封装
-  lib/mys.js           米游社协议（扫码/角色/游戏签到/续期）
-  lib/community.js     独立社区签到与积分查询协议
-  lib/run-policy.js    游戏/社区范围完成与自动尝试策略
-  lib/qr.js            二维码编码器（字节模式、M 级、版本 1–15）
-  lib/scheduler.js     每日随机窗口调度（纯函数 + 定时器）
-  lib/service.js       宿主服务：路由、登录态、签到流程
-  test/                单元测试与端到端测试（假接口）
-  .github/workflows/   CI：Node 22 / 24 上跑全部测试
-```
-
-## 测试
+## 离线测试与已知未验收项
 
 无需安装依赖：
 
-```powershell
-node test/protocol.test.mjs
-node test/schedule.test.mjs
-node test/qr.test.mjs
-node test/service.test.mjs
-node test/community-state.test.mjs
-node test/community.test.mjs
-node test/community-service.test.mjs
-node test/run-policy.test.mjs
-node test/client-community.test.mjs
+```sh
+node --test test/*.test.mjs
 node --check client.js
+node --check lib/service.js
 ```
 
-`qr.test.mjs` 内置一个独立的解码器：读回格式信息、反掩码、反交织、校验每个 Reed–Solomon 块的 syndrome 全为零，并核对数据模块数量与版本容量一致。
+测试使用临时 DSH_HOME、人工凭据与假接口，不回退真实网络；验证协议/状态机、取消与过期竞态、社区/调度非回归及回调/元素描述。**不是 DOM、截图或官方 widget 运行测试。** CI 保留 Node22/24；本次本地使用 Node24，未声称远端 CI 或 Node22 已运行。
 
-测试全部使用人工凭据和假接口，不会回退真实网络。浏览器测试仅验证纯组件描述、交互回调与路由选择，不是 GUI 视觉验收。CI 保持 Node 22/24 矩阵；本地本次验证使用 Node 24，Node 22 和远端 CI 是否运行需另行确认。
+未验收：真实短信及凭据派生、最小社区 Cookie 的线上接受性、官方 widget 在 opaque-origin/srcDoc/CSP 下的兼容性、当前 GUI 的窄屏/浅深色/键盘体验、安装重载与调度实跑。无浏览器控制工具时不使用假 renderer 代替验收。
 
-## 已知限制
+## 参考与许可
 
-- **仅单实例保证互斥**：一个插件实例内部共享锁，不是跨进程锁。不要同时在多个 DSH 实例/进程启用同一账号的自动任务。
-- **本分支尚未上线验收**：只完成离线协议/生命周期/调度/UI 单元验证；没有使用真实账号请求，也没有将隔离工作区接回当前 profile、重载插件或做当前 GUI/浅深色视觉验收。整合与重载需另行确认。
-
-- **无法自动通过验证码**：`1034` 是全域人机验证，只能去米游社 App「我的 → 我的角色」处理。
-- **网页凭据无法续期**：只有 App 扫码通道下发 SToken；网页通道的凭据到期后必须重新扫码（面板会提示）。
-- **Cookie 明文落盘**：这是本地自动签到的必要代价；如需更强保护，可把 `~/.dsh/mys-checkin` 放在加密卷上。
-- **只支持国服**（`*_cn` 的 `game_biz` 与 luna 接口）。
-- **一次运行约 1 分钟**：为了避免特征化请求，游戏之间有随机间隔。
-
-## 许可证
-
-[MIT](LICENSE)。改编参考 [MihoyoBBSTools](https://github.com/Womsxd/MihoyoBBSTools) 的协议参数，版权与 MIT 声明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。本项目仅用于个人账号的自动化，请自行承担使用风险。
+本插件 [MIT](LICENSE)。社区协议参考 [MihoyoBBSTools](https://github.com/Womsxd/MihoyoBBSTools)，保留其 MIT 声明。短信协议参考 [IKUNHEIHIE/miyoushe-checkin](https://github.com/IKUNHEIHIE/miyoushe-checkin) 的公开端点与字段，未确认该参考项目的许可，不将其声称为 MIT 授权或打包其代码/服务。官方 widget 在线加载、不随插件分发、不代表获第三方许可或保证第三方服务可用；详情见 [第三方说明](THIRD_PARTY_NOTICES.md)。
