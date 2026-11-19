@@ -1,6 +1,6 @@
 {
   "name": "@local/dsh-mys-checkin",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "private": true,
   "description": "米游社每日签到（DSH 侧边栏）：短信登录、官方人工验证、游戏与大别野统一签到、随机时间窗口与失败提示。",
   "type": "module",
