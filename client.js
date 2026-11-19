@@ -1,16 +1,15 @@
 /**
  * Browser half of the 米游社 check-in plugin.
  *
- * Registers one Settings section ("米游社") and talks to its host half over
- * four owner-only routes. The cookie never crosses this boundary: the page only
- * ever sees "logged in / expired", the schedule, and the last run's results.
+ * Registers the 米游社 sidebar panel and uses owner-only Host routes.
+ * Long-term credentials never cross this boundary.
  */
 window.__ModuleLoader__.load({
   id: '@local/dsh-mys-checkin',
   factory(require) {
     const React = require('react')
     const h = React.createElement
-    const { useState, useEffect, useRef, useCallback, useMemo } = React
+    const { useState, useEffect, useRef, useCallback } = React
 
     // DSH's own atoms: reusing them keeps every button and switch identical to
     // the built-in settings pages instead of approximating their look.
@@ -27,7 +26,6 @@ window.__ModuleLoader__.load({
     const NS = 'mys-checkin'
 
     const CSS = `
-.mys-community-options{border:0;padding:0;margin:0;min-width:0}
 .mys-section{max-width:820px;color:var(--dsw-alias-label-primary);display:flex;flex-direction:column;gap:14px}
 .mys-head{display:flex;flex-direction:column;gap:4px}
 .mys-title{margin:0;font-size:18px;font-weight:600;line-height:26px}
@@ -177,22 +175,15 @@ window.__ModuleLoader__.load({
       smsWidgetFailed: "人工验证未完成或加载失败。请取消后重新登录；不会自动发送短信。",
       smsSuccess: "登录成功，凭据已完成只读校验。",
       smsSuccessWarning: "游戏凭据校验通过；社区只读校验未通过，请查看社区状态。",
-      communityTitle: "社区签到 · 米游币",
-      communityDesc: "默认关闭。启用后随现有定时窗口运行；仅签到，不看帖、点赞或分享。",
-      communityEnabled: "启用社区签到",
-      communitySelection: "签到分区",
-      communityRun: "立即社区签到",
-      communityOff: "社区签到已关闭",
-      communityEmpty: "请选择至少一个签到分区",
+      communityTitle: "大别野签到 · 米游币",
       communityNoToken: "社区凭据不完整，请重新短信登录；不影响游戏登录。",
       communityMissingMid: "V2 社区凭据缺少必要信息，请重新短信登录；不影响游戏登录。",
-      communityPending: "设置尚未保存生效，请稍候。",
-      communityPartial: "本轮社区签到有未完成分区",
-      communityAccepted: "接口已接受全部分区签到；积分到账未独立验证。",
+      communityPartial: "本轮大别野签到未完成",
+      communityAccepted: "接口已接受大别野签到；积分到账未独立验证。",
       communityNoResult: "尚无社区签到记录",
       communityRisk: "需要人工验证：请在米游社 App 手动处理后再决定是否重试。",
       communityUnknown: "结果不明：请先在米游社 App 核对，不要盲目重复请求。",
-      communityBalanceFail: "积分查询失败；不代表分区签到失败。",
+      communityBalanceFail: "积分查询失败；不代表大别野签到失败。",
       communityHistorical: "历史积分快照",
       communityCurrent: "今日查询快照",
       communityBalance: "米游币余额",
@@ -211,7 +202,7 @@ window.__ModuleLoader__.load({
       outcomeSkipped: "未执行",
       nav: '米游社',
       title: '米游社签到',
-      intro: '游戏与主动启用的社区签到共用每日随机时间窗口；两个手动按钮各自独立。登录凭据只保存在本机。',
+      intro: '在同一处选择游戏与大别野签到项目，手动和定时按已保存的项目执行。登录凭据只保存在本机。',
       account: '账号',
       accountDesc: '使用大陆 +86 手机号短信登录。凭据仅保存于本机；SToken 失效后仍需重新登录。',
       login: '短信登录',
@@ -244,14 +235,21 @@ window.__ModuleLoader__.load({
       nextRun: '下次执行',
       noPlan: '未安排（自动签到未启用）',
       timezone: '时区',
-      games: '游戏',
-      gamesDesc: '只给勾选的游戏签到；角色信息在首次签到或检测时读取。',
       notQueried: '尚未读取角色',
       noRole: '无角色',
       bound: '已绑定',
-      actions: '手动操作',
-      actionsDesc: '签到结果会显示在下方，并写入运行日志。',
-      runNow: '立即游戏签到',
+      projects: '签到项目',
+      projectsDesc: '手动与定时签到使用相同的已保存项目。',
+      dabieye: '大别野（米游币）',
+      dabieyeDesc: '默认关闭；仅签到，不看帖、点赞或分享。',
+      runLoading: '正在加载已保存的签到项目…',
+      runOffline: '无法连接插件宿主端；恢复连接后才能签到。',
+      runBusy: '签到正在进行，请稍候。',
+      runLogin: '请先短信登录。',
+      noTargets: '请至少选中一个签到项目。',
+      targetsChanged: '已保存的签到项目已变更。请查看最新设置，再决定是否签到。未自动重试。',
+      runFailed: '签到请求未确认完成。请查看结果，不要立即重复签到。',
+      runNow: '立即签到',
       running: '签到中…',
       verify: '检测接口与登录',
       verifying: '检测中…',
@@ -275,14 +273,13 @@ window.__ModuleLoader__.load({
       logs: '运行日志',
       logsEmpty: '暂无日志。',
       saveOk: '已保存',
-      saveFail: '保存失败',
+      saveFail: '设置未保存。请调整设置后再等保存完成，或重新打开面板查看宿主端设置。',
       saveFailed: '保存失败：{message}',
       loadFailed: '无法连接插件宿主端：{message}',
       hostMissing: '插件宿主端未加载。请重新加载页面；若仍无效，重启 DSH。',
       bannerExpired: '登录状态已失效，自动签到无法继续。',
       bannerCaptcha: '米游社要求人机验证，今日已停止自动签到。',
       bannerRun: '最近一次签到失败。',
-      retryRun: '重试签到',
       verifyOk: '接口可用，登录有效（{ms}ms）',
       verifyAnon: '尚未登录，无法检测登录状态。',
       verifyFail: '网络不可达：{message}',
@@ -314,7 +311,6 @@ window.__ModuleLoader__.load({
       badgeOpen: '在左侧栏「米游社签到」中处理',
       panel: '米游社签到',
       taskPanelTitle: '米游社签到',
-      taskPanelIntro: '每天在设定窗口内随机时刻为已绑定的米哈游游戏签到；登录、时间窗口、游戏与高级参数都在这里管理。',
       taskName: '每日签到',
       taskFrequency: '运行频率',
       taskRandom: '（窗口内随机）',
@@ -379,18 +375,11 @@ window.__ModuleLoader__.load({
       smsWidgetFailed: "Verification was not completed or could not load. Cancel and sign in again. No SMS was sent automatically.",
       smsSuccess: "Signed in; read-only credential checks passed.",
       smsSuccessWarning: "Game credentials verified; the community check did not pass. See community status.",
-      communityTitle: "Community check-in · Coins",
-      communityDesc: "Off by default. Uses the existing schedule; check-in only, without reading, liking or sharing posts.",
-      communityEnabled: "Enable community check-in",
-      communitySelection: "Communities",
-      communityRun: "Check in to communities",
-      communityOff: "Community check-in is off",
-      communityEmpty: "Select at least one community",
+      communityTitle: "Dabieye check-in · Coins",
       communityNoToken: "Community credentials are incomplete. Sign in again by SMS; game login is unaffected.",
       communityMissingMid: "Required V2 community credentials are missing. Sign in again by SMS; game login is unaffected.",
-      communityPending: "Settings are not saved yet. Please wait.",
-      communityPartial: "Some communities remain incomplete",
-      communityAccepted: "All community requests were accepted; coin credit has not been independently verified.",
+      communityPartial: "Dabieye check-in did not complete",
+      communityAccepted: "The Dabieye check-in was accepted; coin credit has not been independently verified.",
       communityNoResult: "No community check-in record yet",
       communityRisk: "Manual verification is required. Complete it in the Miyoushe App before deciding whether to retry.",
       communityUnknown: "Unknown result. Check in the Miyoushe App before retrying; do not blindly resend.",
@@ -413,7 +402,7 @@ window.__ModuleLoader__.load({
       outcomeSkipped: "Not executed",
       nav: 'miHoYo',
       title: 'miHoYo check-in',
-      intro: 'Games and opt-in community check-in share a randomized daily schedule. Each manual button runs only its own scope. Credentials stay local.',
+      intro: 'Choose games and Dabieye in one place. Manual and scheduled check-ins use your saved selection. Credentials stay on this device.',
       account: 'Account',
       accountDesc: 'Sign in with a mainland China +86 mobile number. Credentials stay on this device; an expired SToken requires signing in again.',
       login: 'Sign in by SMS',
@@ -446,14 +435,21 @@ window.__ModuleLoader__.load({
       nextRun: 'Next run',
       noPlan: 'Not scheduled (automatic check-in is off)',
       timezone: 'Time zone',
-      games: 'Games',
-      gamesDesc: 'Only checked games are signed. Roles are read on the first run or check.',
       notQueried: 'Roles not read yet',
       noRole: 'No character',
       bound: 'Bound',
-      actions: 'Manual actions',
-      actionsDesc: 'Results appear below and in the run log.',
-      runNow: 'Check in to games',
+      projects: 'Check-in targets',
+      projectsDesc: 'Manual and scheduled check-ins use the same saved targets.',
+      dabieye: 'Dabieye (coins)',
+      dabieyeDesc: 'Off by default. Check-in only: no reading, liking or sharing posts.',
+      runLoading: 'Loading saved check-in targets…',
+      runOffline: 'Cannot reach the plugin host. Reconnect before checking in.',
+      runBusy: 'A check-in is in progress. Please wait.',
+      runLogin: 'Sign in by SMS first.',
+      noTargets: 'Select at least one check-in target.',
+      targetsChanged: 'The saved targets changed. Review the latest settings before checking in. The request was not retried.',
+      runFailed: 'The check-in request did not confirm completion. Review the results before trying again.',
+      runNow: 'Check in now',
       running: 'Checking in…',
       verify: 'Test connection and session',
       verifying: 'Testing…',
@@ -477,14 +473,13 @@ window.__ModuleLoader__.load({
       logs: 'Run log',
       logsEmpty: 'No log entries yet.',
       saveOk: 'Saved',
-      saveFail: 'Save failed',
+      saveFail: 'Settings were not saved. Edit again and wait for the save, or reopen the panel to see the host settings.',
       saveFailed: 'Save failed: {message}',
       loadFailed: 'Cannot reach the plugin host: {message}',
       hostMissing: 'The plugin host is not loaded. Reload the page, and restart DSH if this persists.',
       bannerExpired: 'The session expired; automatic check-in cannot continue.',
       bannerCaptcha: 'miHoYo asked for human verification; today\'s run stopped.',
       bannerRun: 'The last check-in failed.',
-      retryRun: 'Retry',
       verifyOk: 'API reachable, session valid ({ms}ms)',
       verifyAnon: 'Not signed in; nothing to verify.',
       verifyFail: 'Network unreachable: {message}',
@@ -516,7 +511,6 @@ window.__ModuleLoader__.load({
       badgeOpen: 'Resolve it in the sidebar panel “miHoYo check-in”',
       panel: 'miHoYo check-in',
       taskPanelTitle: 'miHoYo check-in',
-      taskPanelIntro: 'Signs in to your bound games once a day at a random moment inside your windows; account, windows, games and advanced options are all managed here.',
       taskName: 'Daily check-in',
       taskFrequency: 'Schedule',
       taskRandom: ' (random inside the window)',
@@ -600,7 +594,7 @@ window.__ModuleLoader__.load({
     async function callJson(path, init) {
       const body = await requestJson(path, init)
       if (body !== null && typeof body === 'object' && body.ok === false) {
-        throw new Error(body.error?.message ?? 'request failed')
+        throw Object.assign(new Error(body.error?.message ?? 'request failed'), { code: body.error?.code })
       }
       return body
     }
@@ -735,14 +729,7 @@ window.__ModuleLoader__.load({
         children)
     }
 
-    // Pure element construction, independent from Host protocol modules.
-    function CommunityCard({ t, config, status, patchDraft, onRun, onLogin, loginBusy, busy }) {
-      const community = status?.community ?? {}
-      const selected = config?.community?.gids ?? []
-      const enabled = config?.community?.enabled === true
-      const capability = community.capability ?? { available: false }
-      const pending = config !== null && (enabled !== community.enabled || JSON.stringify(config?.community) !== JSON.stringify(status?.config?.community))
-      const disabled = config === null || !enabled || selected.length === 0 || !capability.available || busy || status?.running === true || pending
+    function CommunityResults({ t, community = {} }) {
       const results = community.lastResult?.results ?? []
       const outcomes = {
         success: 'communityOutcomeSuccess', 'cached-success': 'communityOutcomeCached', captcha: 'communityOutcomeCaptcha',
@@ -755,27 +742,7 @@ window.__ModuleLoader__.load({
       const balance = community.balance
       const current = balance?.day === today && !community.balanceError
       const number = (value) => typeof value === 'number' && Number.isFinite(value) ? String(value) : '—'
-      return h(Card, { title: t('communityTitle'), desc: t('communityDesc') },
-        h('div', { className: 'mys-row' },
-          h('span', { className: 'mys-row-label' }, t('communityEnabled')),
-          h(Switch, { checked: enabled, label: t('communityEnabled'), disabled: config === null,
-            onChange: (value) => patchDraft((next) => { next.community.enabled = value; return next }) })),
-        h('fieldset', { className: 'mys-community-options', disabled: config === null },
-          h('legend', { className: 'mys-meta' }, t('communitySelection')),
-          (community.communities ?? []).map((item) => h('label', { className: 'mys-row', key: item.id },
-            h('input', { type: 'checkbox', 'aria-label': item.label, checked: selected.includes(item.id),
-              onChange: (event) => patchDraft((next) => {
-                const gids = next.community.gids.filter((gid) => gid !== item.id)
-                next.community.gids = event.target.checked ? [...gids, item.id] : gids
-                return next
-              }) }), h('span', null, item.label)))),
-        !enabled ? h('div', { className: 'mys-hint' }, t('communityOff')) : null,
-        enabled && selected.length === 0 ? h('div', { role: 'status', className: 'mys-hint' }, t('communityEmpty')) : null,
-        !capability.available ? h('div', { className: 'mys-hint' },
-          t(capability.reason === 'missing-mid' ? 'communityMissingMid' : 'communityNoToken'),
-          h(Button, { size: 'sm', onClick: onLogin, disabled: loginBusy }, t('relogin'))) : null,
-        pending ? h('div', { role: 'status', className: 'mys-hint' }, t('communityPending')) : null,
-        h('div', { className: 'mys-actions' }, h(Button, { 'data-action': 'community-run', disabled, onClick: onRun }, busy || community.running ? t('running') : t('communityRun'))),
+      return h(Card, { title: t('communityTitle') },
         community.lastError ? h('div', { className: 'mys-banner', 'data-tone': 'warn', role: 'status' }, community.lastError.message) : null,
         h('div', { role: 'status', className: 'mys-meta' }, community.lastResult
           ? t(community.lastResult.ok ? 'communityAccepted' : 'communityPartial') : t('communityNoResult')),
@@ -798,46 +765,166 @@ window.__ModuleLoader__.load({
       return h('span', { className: 'mys-dot', 'data-state': state, 'aria-hidden': true })
     }
 
-    /** Shared status polling: the settings page and the task panel read one payload. */
-    function useMysStatus(onData, initialStatus) {
-      const [status, setStatus] = useState(initialStatus ?? null)
-      const [error, setError] = useState(null)
-      const runningRef = useRef(false)
-      const onDataRef = useRef(onData)
-      onDataRef.current = onData
+    /** Debounce is outside the queue; an edit reserves its revision immediately. */
+    function createConfigSaveQueue({ save, changed, initial = null }) {
+      let confirmed = initial
+      let revision = 0, pending = false, failed = false, queued = null, draining = null
+      const view = () => ({ pending, failed, confirmed })
+      const markEdited = () => {
+        revision++
+        pending = true
+        failed = false
+        changed()
+        return revision
+      }
+      const observe = (config) => {
+        if (!pending && !failed) confirmed = config
+      }
+      const drain = async () => {
+        while (queued !== null) {
+          const job = queued
+          queued = null
+          if (job.revision !== revision) continue
+          try {
+            const config = await save(job.next)
+            if (job.revision !== revision) continue
+            confirmed = config
+          } catch {
+            if (job.revision !== revision) continue
+            failed = true
+          }
+          pending = false
+          changed()
+        }
+        draining = null
+      }
+      const submit = (next, edited = markEdited()) => {
+        if (edited !== revision) return draining
+        queued = { next, revision: edited }
+        draining ??= Promise.resolve().then(drain)
+        return draining
+      }
+      return { markEdited, submit, observe, view }
+    }
 
-      useEffect(() => {
-        runningRef.current = status?.running === true
-      }, [status?.running])
+    function postJson(path, body) {
+      return callJson(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+    }
 
-      const refresh = useCallback(async () => {
+    // Own the status/selection used by both the rendered guard and the click
+    // callback. The callback checks the live snapshot even before React rerenders.
+    function createCheckinPanel({ initialStatus = null, changed }) {
+      let status = initialStatus, draft = status?.config ?? null, error = null
+      let running = false, runIssue = null, needsRefresh = false, readVersion = 0, timer = null
+      const saves = createConfigSaveQueue({
+        initial: draft,
+        async save(config) {
+          const data = await postJson('config', { config })
+          if (!data?.config) throw new Error('Missing saved config')
+          // A poll begun before this acknowledgment cannot supersede it, even
+          // if it finishes when there is no pending edit left to protect it.
+          readVersion++
+          return data.config
+        },
+        changed() {
+          const { pending, failed, confirmed } = saves.view()
+          if (!pending && !failed) {
+            draft = confirmed
+            void refresh()
+          }
+          changed()
+        },
+      })
+      async function refresh() {
+        const version = ++readVersion
         try {
           const data = await callJson('status')
-          setStatus(data)
-          setError(null)
-          if (typeof onDataRef.current === 'function') onDataRef.current(data)
+          if (version !== readVersion) return
+          if (!data?.config) throw new Error('Missing Host config')
+          status = data
+          error = null
+          needsRefresh = false
+          saves.observe(data.config)
+          const { pending, failed, confirmed } = saves.view()
+          if (!pending && !failed) draft = confirmed
         } catch (failure) {
-          const message = String(failure?.message ?? failure)
-          setError(message === 'host-missing' ? 'host-missing' : message)
+          if (version !== readVersion) return
+          error = String(failure?.message ?? failure)
         }
-      }, [])
-
-      useEffect(() => {
-        let stopped = false
-        let timer
-        const tick = async () => {
+        changed()
+      }
+      function patchDraft(mutate) {
+        if (draft === null) return
+        draft = mutate(structuredClone(draft))
+        const edited = saves.markEdited()
+        const next = draft
+        clearTimeout(timer)
+        timer = setTimeout(() => {
+          timer = null
+          return saves.submit(next, edited)
+        }, 650)
+      }
+      function selection() {
+        const { pending, failed, confirmed } = saves.view()
+        const targets = {
+          gameIds: Object.entries(confirmed?.games ?? {}).filter(([, enabled]) => enabled === true).map(([id]) => id),
+          dabieye: confirmed?.community?.enabled === true,
+        }
+        const blocked = error !== null ? 'runOffline'
+          : running || status?.running === true ? 'runBusy'
+            : pending ? 'saving'
+              : failed ? 'saveFail'
+                : confirmed === null || needsRefresh ? 'runLoading'
+                  : !targets.gameIds.length && !targets.dabieye ? 'noTargets'
+                    : !status?.login || status.login.state === 'anonymous' ? 'runLogin' : null
+        return { targets, blocked }
+      }
+      async function runNow() {
+        const { targets, blocked } = selection()
+        if (blocked !== null) return
+        running = true
+        runIssue = null
+        changed()
+        try {
+          await postJson('run/checkin', targets)
+        } catch (failure) {
+          if (failure?.code === 'targets-changed') {
+            needsRefresh = true
+            runIssue = 'targetsChanged'
+          } else {
+            runIssue = 'runFailed'
+          }
+          changed()
+        } finally {
           await refresh()
-          if (stopped) return
-          timer = setTimeout(tick, runningRef.current ? 1500 : 4000)
+          running = false
+          changed()
+        }
+      }
+      return {
+        patchDraft, refresh, runNow,
+        cancelDebounce: () => clearTimeout(timer),
+        view: () => ({ status, error, draft, runIssue, runBlocked: selection().blocked }),
+      }
+    }
+
+    function useCheckinPanel(initialStatus) {
+      const [, render] = useState(0)
+      const [panel] = useState(() => createCheckinPanel({ initialStatus, changed: () => render((revision) => revision + 1) }))
+      useEffect(() => {
+        let stopped = false, timer
+        async function tick() {
+          await panel.refresh()
+          if (!stopped) timer = setTimeout(tick, panel.view().status?.running ? 1500 : 4000)
         }
         void tick()
         return () => {
           stopped = true
-          if (timer !== undefined) clearTimeout(timer)
+          clearTimeout(timer)
+          panel.cancelDebounce()
         }
-      }, [refresh])
-
-      return { status, error, refresh }
+      }, [panel])
+      return panel
     }
 
     /** Memory-only callbacks, shared by the account and community login CTAs. */
@@ -1124,26 +1211,13 @@ window.__ModuleLoader__.load({
 
     function Section({ t, __status }) {
       const [notice, setNotice] = useState(null)
-      const [draft, setDraft] = useState(null)
-      const [busy, setBusy] = useState({ run: false, community: false, verify: false, refresh: false })
+      const [busy, setBusy] = useState({ verify: false, refresh: false })
       const [verifyInfo, setVerifyInfo] = useState(null)
       const [deleteArmed, setDeleteArmed] = useState(false)
-      const dirtyRef = useRef(false)
-      const saveTimerRef = useRef(null)
-      const draftRef = useRef(null)
-
-      // Keep the editable draft in step with the host unless the user is mid-edit.
-      const { status, error, refresh } = useMysStatus((data) => {
-        if (!dirtyRef.current && data.config) {
-          draftRef.current = data.config
-          setDraft(data.config)
-        }
-      }, __status)
+      const panel = useCheckinPanel(__status)
+      const { status, error, draft, runIssue, runBlocked } = panel.view()
+      const { refresh, patchDraft, runNow } = panel
       const loginFlow = useMysLogin({ t, refresh, onNotice: setNotice })
-
-      useEffect(() => () => {
-        if (saveTimerRef.current !== null) clearTimeout(saveTimerRef.current)
-      }, [])
 
       useEffect(() => {
         if (notice === null) return undefined
@@ -1157,34 +1231,6 @@ window.__ModuleLoader__.load({
         const timer = setTimeout(() => setDeleteArmed(false), 6000)
         return () => clearTimeout(timer)
       }, [deleteArmed])
-
-      const scheduleSave = useCallback((next) => {
-        dirtyRef.current = true
-        if (saveTimerRef.current !== null) clearTimeout(saveTimerRef.current)
-        saveTimerRef.current = setTimeout(async () => {
-          saveTimerRef.current = null
-          try {
-            await callJson('config', {
-              method: 'POST',
-              headers: { 'content-type': 'application/json' },
-              body: JSON.stringify({ config: next }),
-            })
-            dirtyRef.current = false
-            setNotice(t('saveOk'))
-            void refresh()
-          } catch (failure) {
-            setNotice(fill(t('saveFailed'), { message: String(failure?.message ?? failure) }))
-          }
-        }, 650)
-      }, [refresh, t])
-
-      const patchDraft = useCallback((mutate) => {
-        if (draftRef.current === null) return
-        const next = mutate(structuredClone(draftRef.current))
-        draftRef.current = next
-        setDraft(next)
-        scheduleSave(next)
-      }, [scheduleSave])
 
       const logout = useCallback(async () => {
         try {
@@ -1205,30 +1251,6 @@ window.__ModuleLoader__.load({
         setDeleteArmed(false)
         void logout()
       }, [deleteArmed, logout])
-
-      const runNow = useCallback(async () => {
-        setBusy((current) => ({ ...current, run: true }))
-        try {
-          await callJson('run', { method: 'POST', body: '{}' })
-          void refresh()
-        } catch (failure) {
-          setNotice(fill(t('saveFailed'), { message: String(failure?.message ?? failure) }))
-        } finally {
-          setBusy((current) => ({ ...current, run: false }))
-        }
-      }, [refresh, t])
-
-      const runCommunityNow = useCallback(async () => {
-        setBusy((current) => ({ ...current, community: true }))
-        try {
-          await callJson('community/run', { method: 'POST', body: '{}' })
-          void refresh()
-        } catch (failure) {
-          setNotice(fill(t('saveFailed'), { message: String(failure?.message ?? failure) }))
-        } finally {
-          setBusy((current) => ({ ...current, community: false }))
-        }
-      }, [refresh, t])
 
       const refreshCredentials = useCallback(async () => {
         setBusy((current) => ({ ...current, refresh: true }))
@@ -1285,9 +1307,7 @@ window.__ModuleLoader__.load({
         }
         return h('div', { className: 'mys-banner', 'data-tone': 'warn' },
           h('div', null, t('bannerRun')),
-          h('div', { className: 'mys-hint' }, String(lastError.message ?? '')),
-          h('div', { className: 'mys-banner-actions' },
-            h(Button, { onClick: runNow, disabled: busy.run || busy.community || status?.running }, t('retryRun'))))
+          h('div', { className: 'mys-hint' }, String(lastError.message ?? '')))
       })()
 
       const login = status?.login ?? { state: 'anonymous' }
@@ -1313,14 +1333,17 @@ window.__ModuleLoader__.load({
           h('div', { className: 'mys-actions' },
             h(Button, {
               variant: 'primary',
-              disabled: busy.run || busy.community || status?.running === true || login.state === 'anonymous',
+              disabled: runBlocked !== null,
+              'aria-describedby': runBlocked !== null ? 'mys-run-hint' : undefined,
               onClick: runNow,
-            }, status?.running === true || busy.run || busy.community ? t('running') : t('runNow')),
+            }, runBlocked === 'runBusy' ? t('running') : t('runNow')),
             h(Button, {
               disabled: config === null,
               onClick: () => patchDraft((next) => { next.enabled = !enabled; return next }),
             }, enabled ? t('taskPause') : t('taskResume')))),
 
+        h('div', { id: 'mys-run-hint', role: 'status', className: 'mys-hint', hidden: runBlocked === null }, runBlocked === null ? '' : t(runBlocked)),
+        runIssue !== null ? h('div', { role: 'status', className: 'mys-banner', 'data-tone': 'warn' }, t(runIssue)) : null,
         error !== null ? h('div', { className: 'mys-banner', 'data-tone': 'error' }, fill(t('loadFailed'), { message: error })) : null,
         banner,
         notice !== null ? h('div', { className: 'mys-banner', 'data-tone': 'ok' }, notice) : null,
@@ -1482,28 +1505,33 @@ window.__ModuleLoader__.load({
           h('div', { className: 'mys-meta' },
             `${t('nextRun')}：${targetText === null ? t('noPlan') : `${targetText}（${t(reasonKey)}）`}`)),
 
-        h(CommunityCard, { t, config, status, patchDraft, onRun: runCommunityNow, onLogin: loginFlow.startLogin, loginBusy: loginFlow.busy, busy: busy.community || busy.run }),
-
-        h(Card, { title: t('games'), desc: t('gamesDesc') },
+        h(Card, { title: t('projects'), desc: t('projectsDesc') },
           h('div', { className: 'mys-list' },
-            games.map((game) => h('div', { className: 'mys-row', key: game.id },
+            games.map((game) => h('label', { className: 'mys-row', key: game.id },
+              h('span', { className: 'mys-row-label' },
+                h('span', { className: 'mys-row-title' }, game.label),
+                h('span', { className: 'mys-row-desc' },
+                  game.role == null ? t('notQueried')
+                    : typeof game.role === 'object' ? `${game.role.nickname ?? ''} ${game.role.uid ?? ''} ${game.role.regionName ?? ''}`.trim()
+                      : t('noRole'))),
               h('input', {
                 type: 'checkbox',
-                checked: game.enabled === true,
+                checked: config?.games?.[game.id] === true,
+                disabled: config === null,
                 'aria-label': game.label,
-                onChange: (event) => patchDraft((next) => {
-                  next.games[game.id] = event.target.checked
-                  return next
-                }),
-              }),
+                onChange: (event) => patchDraft((next) => { next.games[game.id] = event.target.checked; return next }),
+              }))),
+            h('div', { className: 'mys-row' },
               h('div', { className: 'mys-row-label' },
-                h('div', { className: 'mys-row-title' }, game.label),
-                h('div', { className: 'mys-row-desc' },
-                  game.role === null || game.role === undefined
-                    ? t('notQueried')
-                    : typeof game.role === 'object' && game.role !== null
-                      ? `${game.role.nickname ?? ''} ${game.role.uid ?? ''} ${game.role.regionName ?? ''}`.trim()
-                      : t('noRole'))))))),
+                h('div', { className: 'mys-row-title' }, t('dabieye')),
+                h('div', { className: 'mys-row-desc' }, t('dabieyeDesc'))),
+              h(Switch, { checked: config?.community?.enabled === true, label: t('dabieye'), disabled: config === null,
+                onChange: (value) => patchDraft((next) => { next.community.enabled = value; return next }) }))),
+          login.state !== 'anonymous' && status?.community?.capability?.available === false
+            ? h('div', { className: 'mys-row' },
+                h('div', { className: 'mys-row-desc mys-row-label' }, t(status.community.capability.reason === 'missing-mid' ? 'communityMissingMid' : 'communityNoToken')),
+                h(Button, { size: 'sm', onClick: loginFlow.startLogin, disabled: loginFlow.busy }, t('relogin')))
+            : null),
 
         h('section', { className: 'mys-page-section' },
           h('h2', null, t('taskRunHistory')),
@@ -1556,7 +1584,8 @@ window.__ModuleLoader__.load({
                       h('td', null, awardsText(item.awards)),
                       h('td', null, typeof item.totalDays === 'number' ? `${item.totalDays}/25` : '—')))))),
                   h('div', { className: 'mys-run-foot' }, allDone ? t('runFooterDone') : t('runFooterPartial')))
-              })()),
+               })(),
+          h(CommunityResults, { t, community: status?.community })),
 
         h('details', { className: 'mys-details' },
           h('summary', null, t('advanced')),

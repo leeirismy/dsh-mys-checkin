@@ -3,19 +3,18 @@ import fs from 'node:fs'
 import vm from 'node:vm'
 import test from 'node:test'
 
-// Unit-only element descriptions: no DOM, effects, timers, visual renderer or real fetch.
-const source = fs.readFileSync(new URL('../client.js', import.meta.url), 'utf8')
-function harness({ communityBusy = false } = {}) {
-  let plugin
-  const slots = new Map(), requests = []
-  let dictionaries
+// Actual callbacks and element descriptions, not a DOM, React renderer, or live Host.
+const source = fs.readFileSync(new URL('../client.js', import.meta.url), 'utf8').replace(
+  "      inject: ['slots', 'locale'],",
+  "      units: { createCheckinPanel: typeof createCheckinPanel === 'function' && createCheckinPanel, createConfigSaveQueue: typeof createConfigSaveQueue === 'function' && createConfigSaveQueue }, inject: ['slots', 'locale'],",
+)
+function harness({ respond = () => { throw new Error('Unexpected offline request') }, locale = 'zh' } = {}) {
+  let plugin, dictionaries
+  const slots = new Map(), requests = [], timers = new Map()
+  let timerId = 0
   const React = {
     createElement: (type, props, ...children) => ({ type, props: { ...props, children } }),
-    useState: (initial) => {
-      const value = typeof initial === 'function' ? initial() : initial
-      // Seed only the local request-state snapshot; no React lifecycle simulation.
-      return [value && typeof value === 'object' && 'community' in value && 'run' in value ? { ...value, community: communityBusy } : value, () => {}]
-    },
+    useState: (init) => [typeof init === 'function' ? init() : init, () => {}],
     useEffect: () => {}, useRef: (current) => ({ current }),
     useCallback: (fn) => fn, useMemo: (fn) => fn(),
   }
@@ -25,14 +24,31 @@ function harness({ communityBusy = false } = {}) {
       throw new Error(`Unexpected browser dependency: ${id}`)
     }) } } },
     document: { baseURI: 'http://offline.invalid/' }, URL, Date, Intl, structuredClone,
-    fetch: async (url, init) => { requests.push({ url, init }); return { status: 200, text: async () => JSON.stringify({ ok: true }) } },
+    setTimeout: (fn, delay) => { timers.set(++timerId, { fn, delay }); return timerId },
+    clearTimeout: (id) => timers.delete(id),
+    fetch: async (url, init) => {
+      const request = { path: new URL(url).pathname, method: init.method ?? 'GET', ...(init.body !== undefined && { body: JSON.parse(init.body) }) }
+      requests.push(request)
+      const response = await respond(request)
+      return { status: 200, text: async () => JSON.stringify(response) }
+    },
   })
   plugin.apply({
     effect: (fn, name) => { if (name.endsWith('dictionaries')) fn() },
-    locale: { register: (ns, values) => { dictionaries = values }, bind: () => (key) => dictionaries.zh[key] ?? key },
+    locale: { register: (ns, values) => { dictionaries = values }, bind: () => (key) => dictionaries[locale][key] ?? key },
     slots: { inject: (name, fn) => fn(), register: (meta, fn) => slots.set(meta.name, fn) },
   })
-  return { Section: slots.get('main'), requests, t: (key) => dictionaries.zh[key] ?? key }
+  const t = (key) => dictionaries[locale][key] ?? key
+  return {
+    tree: (status) => slots.get('main')({ t, __status: status }), t, requests, ...plugin.units,
+    tickSave() {
+      assert.equal(timers.size, 1)
+      const [id, { fn, delay }] = timers.entries().next().value
+      timers.delete(id)
+      assert.equal(delay, 650)
+      return fn()
+    },
+  }
 }
 function nodes(value) {
   if (Array.isArray(value)) return value.flatMap(nodes)
@@ -44,100 +60,220 @@ function text(value) {
   if (!value || typeof value !== 'object') return String(value ?? '')
   return [value.props?.title, value.props?.desc, text(value.props?.children)].filter(Boolean).join(' ')
 }
-function fixture() {
+function config(gameIds = ['genshin'], dabieye = true) {
+  return { enabled: false, windows: [], games: { genshin: gameIds.includes('genshin'), starrail: gameIds.includes('starrail') }, community: { enabled: dabieye, client: {} } }
+}
+function fixture(saved = config()) {
   return {
-    games: [], running: false, login: { state: 'active' },
-    config: { community: { enabled: true, gids: ['5', '2'] } },
-    community: { enabled: true, capability: { available: true, reason: null }, communities: [
-      { id: '5', label: '大别野' }, { id: '2', label: '原神' },
-    ], lastResult: null, lastError: null, balance: null, balanceError: null },
+    ok: true, running: false, login: { state: 'active' }, config: saved,
+    games: [{ id: 'genshin', label: '原神', enabled: saved.games.genshin }, { id: 'starrail', label: '星穹铁道', enabled: saved.games.starrail }],
+    community: { enabled: saved.community.enabled, capability: { available: true, reason: null }, lastResult: null, lastError: null, balance: null, balanceError: null },
   }
 }
-function card(harness, status, extra = {}) {
-  const tree = harness.Section({ t: harness.t, __status: status })
-  const element = nodes(tree).find((node) => node.type?.name === 'CommunityCard')
-  assert.ok(element, 'Community card is visible even when all games are off')
-  return element.type({ ...element.props, config: status.config, ...extra })
+const runPath = '/api/mys/run/checkin'
+function launch(tree, h) {
+  const button = nodes(tree).find((node) => node.type?.name === 'Button' && [h.t('runNow'), h.t('running')].includes(text(node)))
+  assert.ok(button, 'the panel describes the manual check-in button')
+  return button
 }
-function runButton(tree) { return nodes(tree).find((node) => node.props?.['data-action'] === 'community-run') }
+const writes = (h) => h.requests.filter((item) => item.method === 'POST')
+function deferred() { return Promise.withResolvers() }
 
-test('community-panel-states: default off, accessible choices preserve explicit empty selection and save both switch values', () => {
-  const h = harness(), status = fixture(), saved = []
-  status.config.community.enabled = false; status.community.enabled = false
-  const patchDraft = (mutate) => { status.config = mutate(structuredClone(status.config)); saved.push(structuredClone(status.config.community)) }
-  let tree = card(h, status, { patchDraft })
-  const toggle = nodes(tree).find((node) => node.type?.name === 'Switch')
-  assert.equal(toggle.props.checked, false)
-  assert.ok(toggle.props.label)
-  toggle.props.onChange(true)
-  tree = card(h, status, { patchDraft })
-  for (const node of nodes(tree).filter((node) => node.type === 'input' && node.props.type === 'checkbox')) {
-    assert.ok(node.props['aria-label'])
-    node.props.onChange({ target: { checked: false } })
-  }
-  nodes(tree).find((node) => node.type?.name === 'Switch').props.onChange(false)
-  assert.deepEqual(saved.map((item) => item.enabled), [true, true, true, false])
-  assert.deepEqual(status.config.community.gids, [])
-})
-
-test('community-panel-states: disabled, no-token, missing-mid, empty, busy and unsaved changes cannot dispatch', () => {
-  const h = harness()
-  for (const change of [
-    (s) => { s.config.community.enabled = false; s.community.enabled = false },
-    (s) => { s.community.capability = { available: false, reason: 'no-stoken' } },
-    (s) => { s.community.capability = { available: false, reason: 'missing-mid' } },
-    (s) => { s.config.community.gids = [] },
-    (s) => { s.running = true },
-    (s) => { s.config.community.gids = ['2']; s.config = structuredClone(s.config); s.community.enabled = false },
-  ]) {
-    const status = fixture(); change(status)
-    assert.equal(runButton(card(h, status)).props.disabled, true)
-  }
-  assert.equal(runButton(card(h, fixture())).props.disabled, false)
-})
-
-test('community-panel-states: partial, CAPTCHA, unknown and balance failure stay distinct; old balance is historical', () => {
+test('projects share one card and disable the sole manual action at the moment of edit', async () => {
   const h = harness(), status = fixture()
-  status.community.lastResult = { at: 123, ok: false, results: [
-    { gid: '5', label: '大别野', outcome: 'success', message: '接口已接受' },
-    { gid: '2', label: '原神', outcome: 'unknown', message: '无法确认，请勿盲目重试' },
-    { gid: '2', label: '原神', outcome: 'captcha', message: '需要人工验证' },
-  ] }
-  status.community.balanceError = { message: '积分查询失败' }
+  status.lastError = { code: 'RUN_FAILED', message: 'synthetic failure' }
+  const tree = h.tree(status)
+  const card = nodes(tree).find((node) => node.props?.title === '签到项目')
+  assert.ok(card, '签到项目 card is visible')
+  assert.equal(nodes(card).filter((node) => node.type === 'input' && node.props.type === 'checkbox').length, 2)
+  const dabieye = nodes(card).find((node) => node.type?.name === 'Switch')
+  assert.equal(dabieye?.props.label, '大别野（米游币）')
+  assert.equal(dabieye.props.checked, true)
+  const button = launch(tree, h)
+  assert.equal(button.props.disabled, false)
+  dabieye.props.onChange(false)
+  await button.props.onClick()
+  assert.deepEqual(writes(h), [], 'the pre-render click closure cannot bypass the debounce guard')
+  const buttons = nodes(tree).filter((node) => node.type?.name === 'Button')
+  assert.deepEqual(buttons.map(text).filter((label) => /立即.*签到|重试签到/.test(label)), ['立即签到'])
+  assert.doesNotMatch(text(tree), /签到分区|立即社区签到/)
+  assert.match(text(tree), /检测接口与登录/)
+  const en = harness({ locale: 'en' })
+  assert.match(text(en.tree(status)), /Check-in targets.*Dabieye \(coins\)/)
+  assert.equal(text(launch(en.tree(status), en)), 'Check in now')
+})
+
+for (const [gameIds, dabieye] of [[['genshin'], true], [['genshin'], false], [[], true]]) {
+  test(`manual button sends exactly one confirmed snapshot (${gameIds.length} games, community=${dabieye})`, async () => {
+    const status = fixture(config(gameIds, dabieye))
+    const h = harness({ respond: ({ method }) => method === 'GET' ? status : { ok: true, started: true } })
+    const button = launch(h.tree(status), h)
+    assert.equal(button.props.disabled, false)
+    await button.props.onClick()
+    assert.deepEqual(writes(h), [{ path: runPath, method: 'POST', body: { gameIds, dabieye } }])
+  })
+}
+
+test('empty, loading, and Host-busy panels never send a check-in even if callback is invoked', async () => {
+  for (const [status, hint] of [[fixture(config([], false)), /至少.*签到项目/], [null, /加载/], [{ ...fixture(), running: true }, /签到.*进行/]]) {
+    const h = harness()
+    const tree = h.tree(status)
+    const button = launch(tree, h)
+    assert.equal(button.props.disabled, true)
+    assert.match(text(tree), hint)
+    await button.props.onClick()
+    assert.deepEqual(writes(h), [])
+  }
+})
+
+test('old account can repair community credentials by SMS, and unified run still dispatches games', async () => {
+  const status = fixture()
+  status.community.capability = { available: false, reason: 'missing-mid' }
+  const h = harness({ respond: ({ method }) => method === 'GET' ? status : { ok: true, started: true } })
+  const tree = h.tree(status)
+  assert.match(text(tree), /V2 社区凭据.*不影响游戏登录/)
+  const repair = nodes(tree).find((node) => node.type?.name === 'Button' && text(node) === '重新登录')
+  assert.equal(typeof repair?.props.onClick, 'function')
+  repair.props.onClick()
+  assert.equal(h.requests.length, 0, 'opening SMS repair sends nothing')
+  await launch(tree, h).props.onClick()
+  assert.deepEqual(writes(h), [{ path: runPath, method: 'POST', body: { gameIds: ['genshin'], dabieye: true } }])
+})
+
+test('results show community acceptance separately from historical coin balance and query failure', () => {
+  const h = harness(), status = fixture()
+  status.community.lastResult = { at: 123, ok: true, results: [{ gid: '5', label: '大别野', outcome: 'success', message: '合成结果' }] }
+  status.community.balanceError = { message: '合成查询错误' }
   status.community.balance = { totalPoints: 1234, todayReceived: 10, todayRemaining: 0, at: 123, day: '2000-01-01' }
-  const content = text(card(h, status))
-  assert.match(content, /部分|未完成/)
-  assert.match(content, /接口已接受/)
-  assert.match(content, /未知|无法确认/)
-  assert.match(content, /人工验证/)
+  const element = nodes(h.tree(status)).find((node) => ['CommunityResults', 'CommunityCard'].includes(node.type?.name))
+  assert.ok(element, 'community result description is present')
+  const content = text(element.type({ ...element.props, config: status.config }))
+  assert.match(content, /接口已接受.*积分到账未独立验证/)
   assert.match(content, /积分查询失败/)
   assert.match(content, /历史.*快照/)
   assert.match(content, /1234/)
-  assert.doesNotMatch(content, /本次赚取|每日上限|今日余额/)
+  assert.doesNotMatch(content, /本次赚取|每日上限|今日余额|签到分区/)
 })
 
-test('local community submission disables both game launch buttons before host running catches up', () => {
-  for (const communityBusy of [false, true, false]) {
-    const h = harness({ communityBusy }), status = fixture()
-    status.lastError = { code: 'RUN_FAILED', message: 'synthetic previous failure' }
-    const tree = h.Section({ t: h.t, __status: status })
-    const buttons = nodes(tree).filter((node) => node.type?.name === 'Button')
-    const launch = buttons.find((node) => [h.t('runNow'), h.t('running')].includes(text(node)))
-    const retry = buttons.find((node) => text(node) === h.t('retryRun'))
-    assert.ok(launch); assert.ok(retry)
-    assert.equal(launch.props.disabled, communityBusy)
-    assert.equal(retry.props.disabled, communityBusy)
-    assert.equal(text(launch), h.t(communityBusy ? 'running' : 'runNow'))
-    assert.equal(runButton(card(h, status)).props.disabled, communityBusy)
-  }
+test('save queue serializes requests and coalesces queued submissions to the latest snapshot', async () => {
+  const h = harness(), a = deferred(), c = deferred(), startedA = deferred(), startedC = deferred(), sent = []
+  assert.equal(typeof h.createConfigSaveQueue, 'function', 'config queue is independently testable')
+  const queue = h.createConfigSaveQueue({ changed() {}, save(next) {
+    sent.push(next)
+    const first = sent.length === 1
+    if (first) startedA.resolve()
+    else startedC.resolve()
+    return first ? a.promise : c.promise
+  } })
+  const first = queue.submit(config(['genshin'], false))
+  await startedA.promise
+  void queue.submit(config([], false))
+  void queue.submit(config(['starrail'], true))
+  assert.equal(sent.length, 1)
+  a.resolve(config(['genshin'], false))
+  await startedC.promise
+  assert.equal(sent.length, 2)
+  assert.deepEqual(sent[1], config(['starrail'], true))
+  assert.equal(queue.view().pending, true)
+  c.resolve(config(['starrail'], false))
+  await first
+  assert.equal(queue.view().pending, false)
+  assert.deepEqual(queue.view().confirmed, config(['starrail'], false))
 })
 
-test('community-button-routing: community uses its own route while original game action stays unchanged', async () => {
-  const h = harness(), status = fixture()
-  const tree = h.Section({ t: h.t, __status: status })
-  await runButton(card(h, status)).props.onClick()
-  const gameButton = nodes(tree).find((node) => node.type?.name === 'Button' && text(node) === h.t('runNow'))
-  assert.ok(gameButton)
-  await gameButton.props.onClick()
-  assert.deepEqual(h.requests.filter((item) => item.init?.method === 'POST').map((item) => new URL(item.url).pathname), ['/api/mys/community/run', '/api/mys/run'])
+test('new debounce immediately blocks run through superseded success, failed save and polling; recovery uses normalized confirmation', async () => {
+  const a = deferred(), b = deferred(), c = deferred(), startedA = deferred(), status = fixture()
+  let saves = 0
+  const h = harness({ respond(request) {
+    if (request.path.endsWith('/config')) {
+      if (saves === 0) startedA.resolve()
+      return [a.promise, b.promise, c.promise][saves++]
+    }
+    if (request.path === runPath) return { ok: true, started: true }
+    return saves < 3 ? status : fixture(config(['starrail'], false))
+  } })
+  assert.equal(typeof h.createCheckinPanel, 'function', 'panel request controller is present')
+  const panel = h.createCheckinPanel({ initialStatus: status, changed() {} })
+  const edit = (key, value) => panel.patchDraft((next) => { next.games[key] = value; return next })
+  edit('starrail', true)
+  const saveA = h.tickSave()
+  await startedA.promise
+  edit('genshin', false)
+  assert.equal(panel.view().runBlocked, 'saving')
+  a.resolve({ ok: true, config: config(['genshin', 'starrail'], true) }); await saveA
+  assert.equal(panel.view().runBlocked, 'saving', 'A does not unlock while B is still in debounce')
+  assert.equal(panel.view().draft.games.genshin, false)
+  await panel.runNow()
+  const saveB = h.tickSave()
+  b.resolve({ ok: false, error: { code: 'save-refused', message: 'synthetic save rejection' } }); await saveB
+  await panel.refresh()
+  assert.equal(panel.view().runBlocked, 'saveFail')
+  assert.equal(panel.view().draft.games.genshin, false)
+  await panel.runNow()
+  assert.equal(writes(h).filter((r) => r.path === runPath).length, 0)
+  edit('starrail', true)
+  const saveC = h.tickSave()
+  c.resolve({ ok: true, config: config(['starrail'], false) }); await saveC
+  assert.equal(panel.view().draft.community.enabled, false)
+  await panel.runNow()
+  assert.deepEqual(writes(h).filter((r) => r.path === runPath), [{ path: runPath, method: 'POST', body: { gameIds: ['starrail'], dabieye: false } }])
+})
+
+test('status GET started before save cannot resurrect the old confirmed selection after save', async () => {
+  const old = deferred(), original = fixture(), updated = fixture(config(['starrail'], false))
+  let reads = 0
+  const h = harness({ respond(request) {
+    if (request.path.endsWith('/status')) return ++reads === 1 ? old.promise : updated
+    if (request.path.endsWith('/config')) return { ok: true, config: updated.config, status: updated }
+    return { ok: true, started: true }
+  } })
+  assert.equal(typeof h.createCheckinPanel, 'function', 'panel request controller is present')
+  const panel = h.createCheckinPanel({ initialStatus: original, changed() {} })
+  const stale = panel.refresh()
+  panel.patchDraft(() => updated.config)
+  await h.tickSave()
+  old.resolve(original); await stale
+  assert.equal(panel.view().draft.games.genshin, false)
+  await panel.runNow()
+  assert.deepEqual(writes(h).filter((r) => r.path === runPath), [{ path: runPath, method: 'POST', body: { gameIds: ['starrail'], dabieye: false } }])
+})
+
+test('targets-changed enters refresh, prevents duplicates, and never retries the rejected write', async () => {
+  const status = fixture(), start = deferred(), refresh = deferred(), refreshStarted = deferred()
+  const h = harness({ respond: ({ method }) => {
+    if (method !== 'GET') return start.promise
+    refreshStarted.resolve()
+    return refresh.promise
+  } })
+  assert.equal(typeof h.createCheckinPanel, 'function', 'panel request controller is present')
+  const panel = h.createCheckinPanel({ initialStatus: status, changed() {} })
+  const first = panel.runNow()
+  assert.equal(panel.view().runBlocked, 'runBusy')
+  await panel.runNow()
+  start.resolve({ ok: false, started: false, error: { code: 'targets-changed', message: '已保存的签到项目已变更，请刷新后再试' } })
+  await refreshStarted.promise
+  assert.equal(panel.view().runIssue, 'targetsChanged')
+  await panel.runNow()
+  assert.deepEqual(h.requests.map((r) => r.path), [runPath, '/api/mys/status'])
+  refresh.resolve(fixture(config([], false))); await first
+  assert.equal(panel.view().runBlocked, 'noTargets')
+  assert.equal(writes(h).length, 1)
+})
+
+test('failed status read blocks stale targets until a successful read', async () => {
+  const status = fixture()
+  let online = false
+  const h = harness({ respond() {
+    if (!online) throw new Error('Synthetic Host outage')
+    return status
+  } })
+  assert.equal(typeof h.createCheckinPanel, 'function', 'panel request controller is present')
+  const panel = h.createCheckinPanel({ initialStatus: status, changed() {} })
+  await panel.refresh()
+  assert.equal(panel.view().runBlocked, 'runOffline')
+  await panel.runNow()
+  assert.deepEqual(writes(h), [])
+  online = true
+  await panel.refresh()
+  assert.equal(panel.view().runBlocked, null)
 })
