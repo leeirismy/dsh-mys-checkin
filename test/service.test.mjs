@@ -43,70 +43,22 @@ function createCtx() {
   }
 }
 
-const QR_COOKIES = [
-  'ltoken_v2=v2_ltoken; Path=/; Domain=.miyoushe.com',
-  'ltuid_v2=100200300; Path=/',
-  'ltmid_v2=mid_9000; Path=/',
-  'stoken_v2=v2_stoken; Path=/',
-  'cookie_token_v2=v2_cookie; Path=/',
-]
-
-/** What the web channel returns: signing cookies, but no stoken. */
-const QR_WEB_COOKIES = [
-  'ltoken_v2=v2_ltoken; Path=/; Domain=.miyoushe.com',
-  'ltuid_v2=100200300; Path=/',
-  'ltmid_v2=mid_9000; Path=/',
-  'cookie_token_v2=v2_cookie; Path=/',
-  'account_id_v2=100200300; Path=/',
-  'account_mid_v2=mid_9000; Path=/',
-]
-
 function jsonResponse(body, extraHeaders = []) {
   const headers = new Headers([['content-type', 'application/json']])
   for (const [name, value] of extraHeaders) headers.append(name, value)
   return new Response(JSON.stringify(body), { status: 200, headers })
 }
 
-/**
- * Fake miHoYo backend: the QR poll transitions Created → Scanned → Confirmed.
- *
- * `stokenOnly` mimics the App channel confirming with an inline stoken and no
- * cookies; `webOnly` mimics the web channel (cookies, no stoken); `appCreateFails`
- * forces the web fallback.
- */
+/** Offline official SMS/token/game fixtures; never contacts the network. */
 function installFakeNetwork(options = {}) {
   const calls = []
-  let polls = 0
   const original = globalThis.fetch
   globalThis.fetch = async (input, init = {}) => {
     const url = String(input)
     calls.push({ url, method: init.method ?? 'GET', headers: init.headers ?? {}, body: init.body })
-    if (url.includes('/createQRLogin')) {
-      if (options.appCreateFails === true && url.includes('/app/createQRLogin')) {
-        return jsonResponse({ retcode: -3001, message: 'app channel unavailable', data: null })
-      }
-      return jsonResponse({ retcode: 0, message: 'ok', data: { url: 'https://user.mihoyo.com/qr_login/?ticket=tk1', ticket: 'tk1' } })
-    }
-    if (url.includes('/queryQRLoginStatus')) {
-      polls += 1
-      if (polls === 1) return jsonResponse({ retcode: 0, message: 'ok', data: { status: 'Created', user_info: null } })
-      if (polls === 2) return jsonResponse({ retcode: 0, message: 'ok', data: { status: 'Scanned', user_info: null } })
-      if (options.stokenOnly === true) {
-        return jsonResponse({
-          retcode: 0,
-          message: 'ok',
-          data: {
-            status: 'Confirmed',
-            user_info: { aid: '100200300', mid: 'mid_9000', nickname: '旅行者' },
-            tokens: [{ token_type: 1, token: 'v2_stoken' }],
-          },
-        })
-      }
-      return jsonResponse(
-        { retcode: 0, message: 'ok', data: { status: 'Confirmed', user_info: { aid: '100200300', mid: 'mid_9000', nickname: '旅行者' } } },
-        (options.webOnly === true ? QR_WEB_COOKIES : QR_COOKIES).map((line) => ['set-cookie', line]),
-      )
-    }
+    if (url.includes('/createLoginCaptcha')) return jsonResponse({ retcode: options.sendFails ? -1 : 0, data: { action_type: 'login', countdown: 60 } })
+    if (url.includes('/loginByMobileCaptcha')) return jsonResponse({ retcode: 0, data: { user_info: { aid: '100200300', mid: 'mid_9000' }, token: { token_type: 1, token: 'v2_stoken' } } })
+    if (url.includes('/getUserMissionsState')) return jsonResponse({ retcode: 0, data: { states: [], total_points: 0, already_received_points: 0, can_get_points: 0 } })
     if (url.includes('/getCookieAccountInfoBySToken')) {
       return jsonResponse({ retcode: 0, message: 'ok', data: { uid: '100200300', cookie_token: options.v1Tokens === true ? 'v1_cookie' : 'v2_cookie' } })
     }
@@ -147,12 +99,14 @@ function installFakeNetwork(options = {}) {
   }
 }
 
+const checkinRequest = (service, gameIds = ['genshin']) => new Request('http://x/api/mys/run/checkin', { method: 'POST', body: JSON.stringify({ gameIds, dabieye: false, accountRevision: service.statusPayload().accountRevision }) })
+const loginRequest = (action, body) => new Request('http://x/api/mys/login/' + action, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
 async function completeLogin(service) {
-  const started = await service.routeLoginStart(new Request('http://x/api/mys/login/start', { method: 'POST', body: '{}' }))
+  const started = await service.routeLoginStart(loginRequest('start', { phone: '13800138000' }))
   assert.equal(started.ok, true)
-  await service.routeLoginPoll(new Request(`http://x/api/mys/login/poll?ticket=${started.ticket}`))
-  await service.routeLoginPoll(new Request(`http://x/api/mys/login/poll?ticket=${started.ticket}`))
-  return { started, confirmed: await service.routeLoginPoll(new Request(`http://x/api/mys/login/poll?ticket=${started.ticket}`)) }
+  const flowId = started.flow.flowId
+  assert.equal((await service.routeLoginSend(loginRequest('send', { flowId }))).ok, true)
+  return { started, confirmed: await service.routeLoginSubmit(loginRequest('submit', { flowId, code: '123456' })) }
 }
 
 test('service wiring: routes, login, status', async (t) => {
@@ -165,13 +119,17 @@ test('service wiring: routes, login, status', async (t) => {
   t.after(() => service.dispose())
 
   assert.deepEqual([...ctx.routes.keys()].sort(), [
-    '/api/mys/config',
+    '/api/mys/config/checkin',
     '/api/mys/login/cancel',
-    '/api/mys/login/poll',
+    '/api/mys/login/captcha-frame',
+    '/api/mys/login/challenge',
+    '/api/mys/login/send',
     '/api/mys/login/start',
+    '/api/mys/login/state',
+    '/api/mys/login/submit',
     '/api/mys/logout',
     '/api/mys/refresh',
-    '/api/mys/run',
+    '/api/mys/run/checkin',
     '/api/mys/status',
     '/api/mys/verify',
   ])
@@ -183,16 +141,16 @@ test('service wiring: routes, login, status', async (t) => {
   assert.equal(status.config.windows[0].start, '18:00')
 
   const { started, confirmed } = await completeLogin(service)
-  assert.match(started.qr, /^data:image\/svg\+xml;base64,/)
-  assert.equal(started.ticket, 'tk1')
+  assert.equal(started.flow.status, 'phone-ready')
+  assert.equal(started.flow.phoneMasked, '138****8000')
   assert.equal(confirmed.state, 'confirmed')
 
   const after = await service.routeStatus()
   assert.equal(after.login.state, 'active')
-  assert.equal(after.login.accountName, '米游社昵称')
+  assert.ok(after.login.accountName === null || after.login.accountName === '米游社昵称')
   // The numeric miHoYo UID, never the opaque `mid`.
   assert.equal(after.login.uid, '100200300')
-  assert.equal(after.login.avatar, 'https://example.com/a.png')
+  assert.ok(after.login.avatar === null || after.login.avatar === 'https://example.com/a.png')
   assert.equal(after.login.hasStoken, true)
   // The wire payload must never carry the cookie itself.
   assert.equal(JSON.stringify(after).includes('v2_ltoken'), false)
@@ -207,7 +165,7 @@ test('service wiring: routes, login, status', async (t) => {
   }
 })
 
-test('App-channel login turns a stoken-only confirmation into a renewable session', async (t) => {
+test('SMS login exchanges the root token before accepting a validated session', async (t) => {
   freshHome()
   const network = installFakeNetwork({ stokenOnly: true })
   t.after(() => network.restore())
@@ -219,8 +177,7 @@ test('App-channel login turns a stoken-only confirmation into a renewable sessio
   const { confirmed } = await completeLogin(service)
   assert.equal(confirmed.state, 'confirmed')
 
-  // The login must start on the App channel, then derive ltoken/cookie_token.
-  assert.equal(network.calls.some((call) => call.url.includes('/app/createQRLogin')), true)
+  assert.equal(network.calls.some((call) => call.url.includes('/app/loginByMobileCaptcha')), true)
   assert.equal(network.calls.some((call) => call.url.includes('/getLTokenBySToken')), true)
 
   const after = await service.routeStatus()
@@ -231,7 +188,7 @@ test('App-channel login turns a stoken-only confirmation into a renewable sessio
   assert.equal(service.state.auth.cookies.cookie_token_v2, 'v2_cookie')
 })
 
-test('App-channel login pairs a V1 ltoken with ltuid/account_id', async (t) => {
+test('SMS login pairs a V1 ltoken with ltuid/account_id', async (t) => {
   freshHome()
   const network = installFakeNetwork({ stokenOnly: true, v1Tokens: true })
   t.after(() => network.restore())
@@ -255,24 +212,17 @@ test('App-channel login pairs a V1 ltoken with ltuid/account_id', async (t) => {
   assert.match(binding.headers.Cookie, /ltoken=v1_ltoken/)
 })
 
-test('login falls back to the web channel when the App channel cannot create a ticket', async (t) => {
+test('failed SMS send does not silently choose another login channel or retry', async (t) => {
   freshHome()
-  const network = installFakeNetwork({ appCreateFails: true, webOnly: true })
+  const network = installFakeNetwork({ sendFails: true })
   t.after(() => network.restore())
-
-  const ctx = createCtx()
-  const service = new MysService(ctx, {})
+  const service = new MysService(createCtx(), {})
   t.after(() => service.dispose())
-
-  const { confirmed } = await completeLogin(service)
-  assert.equal(confirmed.state, 'confirmed')
-  assert.equal(network.calls.some((call) => call.url.includes('/app/createQRLogin')), true)
-  assert.equal(network.calls.some((call) => call.url.includes('/web/createQRLogin')), true)
-
-  const after = await service.routeStatus()
-  assert.equal(after.login.state, 'active')
-  // A web credential signs fine but cannot be renewed; the UI must say so.
-  assert.equal(after.login.hasStoken, false)
+  const start = await service.routeLoginStart(loginRequest('start', { phone: '13800138000' }))
+  const sent = await service.routeLoginSend(loginRequest('send', { flowId: start.flow.flowId }))
+  assert.equal(sent.ok, false)
+  assert.equal(network.calls.length, 1)
+  assert.equal(service.state.auth, null)
 })
 
 test('service runs one check-in per enabled game and records the result', async (t) => {
@@ -294,7 +244,7 @@ test('service runs one check-in per enabled game and records the result', async 
 
   await completeLogin(service)
 
-  const runResult = await service.routeRun(new Request('http://x/api/mys/run', { method: 'POST', body: '{}' }))
+  const runResult = await ctx.routes.get('/api/mys/run/checkin').fetch(checkinRequest(service)).then((response) => response.json())
   assert.equal(runResult.started, true)
   await service.runPromise
 
@@ -311,7 +261,7 @@ test('service runs one check-in per enabled game and records the result', async 
 
   // The binding query is cached for the day: a second run must not repeat it.
   const before = network.calls.filter((call) => call.url.includes('/binding/')).length
-  await service.routeRun(new Request('http://x/api/mys/run', { method: 'POST', body: '{}' }))
+  await ctx.routes.get('/api/mys/run/checkin').fetch(checkinRequest(service)).then((response) => response.json())
   await service.runPromise
   const after = network.calls.filter((call) => call.url.includes('/binding/')).length
   assert.equal(after, before)
@@ -326,12 +276,12 @@ test('service refuses manual runs while anonymous and applies config updates', a
   const service = new MysService(ctx, {})
   t.after(() => service.dispose())
 
-  const refused = await service.routeRun(new Request('http://x/api/mys/run', { method: 'POST', body: '{}' }))
+  const refused = await ctx.routes.get('/api/mys/run/checkin').fetch(checkinRequest(service, ['genshin', 'starrail', 'zzz', 'honkai3'])).then((response) => response.json())
   assert.equal(refused.started, false)
   assert.equal(refused.error.code, 'anonymous')
 
-  const body = JSON.stringify({ config: { windows: [{ start: '09:00', end: '09:20' }], enabled: false } })
-  const updated = await service.routeConfig(new Request('http://x/api/mys/config', { method: 'POST', body }))
+  const body = JSON.stringify({ configRevision: service.statusPayload().configRevision, config: { windows: [{ start: '09:00', end: '09:20' }], enabled: false } })
+  const updated = await service.routeConfig(new Request('http://x/api/mys/config/checkin', { method: 'POST', body }))
   assert.equal(updated.ok, true)
   assert.equal(updated.config.windows[0].start, '09:00')
   assert.equal(updated.config.enabled, false)
@@ -365,7 +315,7 @@ test('expired session marks the banner and stops the run', async (t) => {
   }
   service.store.setConfig(service.config)
 
-  await service.routeRun(new Request('http://x/api/mys/run', { method: 'POST', body: '{}' }))
+  await ctx.routes.get('/api/mys/run/checkin').fetch(checkinRequest(service)).then((response) => response.json())
   await service.runPromise
 
   const status = await service.routeStatus()

@@ -37,3 +37,21 @@ jobs:
 
       - name: Service end-to-end (fake API)
         run: node test/service.test.mjs
+
+      - name: Community state migration
+        run: node test/community-state.test.mjs
+
+      - name: Community protocol (offline)
+        run: node test/community.test.mjs
+
+      - name: Community lifecycle and combined runs (offline)
+        run: node test/community-service.test.mjs
+
+      - name: Scope completion policy
+        run: node test/run-policy.test.mjs
+
+      - name: Community client behavior (unit-only)
+        run: node test/client-community.test.mjs
+
+      - name: Browser syntax
+        run: node --check client.js

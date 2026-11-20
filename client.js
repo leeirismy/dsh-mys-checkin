@@ -1,27 +1,15 @@
 /**
  * Browser half of the 米游社 check-in plugin.
  *
- * Registers one Settings section ("米游社") and talks to its host half over
- * four owner-only routes. The cookie never crosses this boundary: the page only
- * ever sees "logged in / expired", the schedule, and the last run's results.
+ * Registers the 米游社 sidebar panel and uses owner-only Host routes.
+ * Long-term credentials never cross this boundary.
  */
 window.__ModuleLoader__.load({
   id: '@local/dsh-mys-checkin',
   factory(require) {
     const React = require('react')
     const h = React.createElement
-    const { useState, useEffect, useRef, useCallback, useMemo } = React
-
-    // DSH's own atoms: reusing them keeps every button and switch identical to
-    // the built-in settings pages instead of approximating their look.
-    let primitives = null
-    try {
-      primitives = require('@deepseek-ai/dsh-client-ui-primitives')
-    } catch {
-      primitives = null
-    }
-    const PrimitiveButton = typeof primitives?.Button === 'function' ? primitives.Button : null
-    const PrimitiveSwitch = typeof primitives?.Switch === 'function' ? primitives.Switch : null
+    const { useState, useEffect, useRef, useCallback } = React
 
     const PLUGIN_ID = '@local/dsh-mys-checkin'
     const NS = 'mys-checkin'
@@ -34,7 +22,7 @@ window.__ModuleLoader__.load({
 .mys-card{box-sizing:border-box;border:.5px solid var(--dsw-alias-border-l2);border-radius:10px;background:var(--dsw-alias-bg-layer-1,transparent);padding:14px 16px;display:flex;flex-direction:column;gap:12px}
 .mys-card-head{display:flex;align-items:flex-start;gap:12px}
 .mys-card-head-text{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
-.mys-card-title{font-size:14px;font-weight:600;line-height:22px}
+.mys-card-title{margin:0;font-size:14px;font-weight:600;line-height:22px}
 .mys-card-desc{font-size:12px;line-height:18px;color:var(--dsw-alias-label-tertiary)}
 .mys-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .mys-btn{box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;gap:6px;height:36px;padding:0 14px;font:inherit;font-size:14px;line-height:22px;border-radius:var(--dsw-radius-md,8px);cursor:pointer;white-space:nowrap;transition:background .12s ease,color .12s ease,border-color .12s ease}
@@ -50,26 +38,28 @@ window.__ModuleLoader__.load({
 .mys-danger-text{color:var(--dsw-alias-state-error-primary,#d93026)}
 .mys-account{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px;line-height:20px;flex:1;min-width:0}
 .mys-dot{width:8px;height:8px;border-radius:50%;flex:none;background:var(--dsw-alias-label-tertiary,#8a919e)}
-.mys-dot[data-state=active]{background:#22a06b}
-.mys-dot[data-state=expired]{background:#d93026}
+.mys-dot[data-state=active]{background:var(--dsw-alias-state-success-primary)}
+.mys-dot[data-state=expired]{background:var(--dsw-alias-state-error-primary)}
 .mys-meta{color:var(--dsw-alias-label-tertiary);font-size:12px}
 .mys-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .mys-row-label{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
 .mys-row-title{font-size:13px;line-height:20px}
 .mys-row-desc{font-size:12px;line-height:18px;color:var(--dsw-alias-label-tertiary)}
 .mys-row input[type=checkbox]{flex:none;width:15px;height:15px;margin:0;cursor:pointer;accent-color:var(--dsw-alias-button-primary-fill,#4d6bfe)}
-.mys-switch{position:relative;flex:none;box-sizing:border-box;width:36px;height:20px;padding:0;border:none;border-radius:999px;cursor:pointer;background:var(--dsw-alias-bg-layer-3,#d9dde3);transition:background .15s ease}
-.mys-switch[aria-checked=true]{background:var(--dsw-alias-brand-primary,#4d8dff)}
+.mys-switch{position:relative;flex:none;box-sizing:border-box;width:36px;height:20px;padding:0;border:none;border-radius:999px;cursor:pointer;background:var(--dsw-alias-border-selected);transition:background .15s ease}
+.mys-switch[aria-checked=true]{background:var(--dsw-alias-brand-primary)}
+.mys-switch:disabled{opacity:.5;cursor:default}
 .mys-switch:focus-visible{outline:2px solid var(--dsw-alias-brand-primary,#4d8dff);outline-offset:2px}
-.mys-knob{position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.3);transition:transform .15s ease}
+.mys-knob{position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:var(--dsw-alias-switch-thumb);transition:transform .15s ease}
 .mys-switch[aria-checked=true] .mys-knob{transform:translateX(16px)}
 .mys-window{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .mys-time{box-sizing:border-box;font:inherit;font-size:12px;height:28px;padding:0 8px;border-radius:6px;border:.5px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-1,transparent);color:var(--dsw-alias-label-primary)}
 .mys-time:focus-visible{outline:2px solid var(--dsw-focus-ring-color,var(--dsw-alias-brand-primary,#4d6bfe));outline-offset:1px}
 .mys-banner{box-sizing:border-box;border-radius:10px;padding:10px 12px;font-size:13px;line-height:20px;display:flex;flex-direction:column;gap:6px;border:.5px solid transparent}
-.mys-banner[data-tone=error]{background:rgba(217,48,38,.08);border-color:rgba(217,48,38,.35);color:var(--dsw-alias-state-error-primary,#a3231c)}
-.mys-banner[data-tone=warn]{background:rgba(214,148,0,.1);border-color:rgba(214,148,0,.35);color:var(--dsw-alias-state-warning-primary,#8a5b00)}
-.mys-banner[data-tone=ok]{background:rgba(34,160,107,.1);border-color:rgba(34,160,107,.3);color:#177a50}
+.mys-banner[hidden]{display:none}
+.mys-banner[data-tone=error]{background:color-mix(in srgb,var(--dsw-alias-state-error-primary) 8%,transparent);border-color:var(--dsw-alias-state-error-secondary);color:var(--dsw-alias-state-error-primary)}
+.mys-banner[data-tone=warn]{background:var(--dsw-alias-state-warn-tertiary);border-color:var(--dsw-alias-state-warn-secondary);color:var(--dsw-alias-state-warn-label)}
+.mys-banner[data-tone=ok]{background:var(--dsw-alias-state-success-tertiary);border-color:var(--dsw-alias-state-success-secondary);color:var(--dsw-alias-state-success-primary)}
 .mys-banner-actions{display:flex;gap:8px;flex-wrap:wrap}
 .mys-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
 .mys-field{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--dsw-alias-label-tertiary)}
@@ -79,22 +69,21 @@ window.__ModuleLoader__.load({
 .mys-table th{text-align:left;font-weight:500;color:var(--dsw-alias-label-tertiary);padding:4px 6px;border-bottom:.5px solid var(--dsw-alias-border-l2)}
 .mys-table td{padding:4px 6px;border-bottom:.5px solid var(--dsw-alias-border-l2)}
 .mys-tag{display:inline-block;font-size:11px;line-height:16px;padding:0 6px;border-radius:6px;background:var(--dsw-alias-bg-layer-3,#eceff3);color:var(--dsw-alias-label-secondary,#4b5563)}
-.mys-tag[data-tone=ok]{background:rgba(34,160,107,.15);color:#177a50}
-.mys-tag[data-tone=warn]{background:rgba(214,148,0,.15);color:#8a5b00}
-.mys-tag[data-tone=error]{background:rgba(217,48,38,.13);color:#a3231c}
-.mys-logs{max-height:200px;overflow:auto;display:flex;flex-direction:column;gap:4px;font-size:12px;line-height:18px;font-family:var(--dsw-font-mono,ui-monospace,SFMono-Regular,Menlo,monospace)}
+.mys-tag[data-tone=ok]{background:var(--dsw-alias-state-success-tertiary);color:var(--dsw-alias-state-success-primary)}
+.mys-tag[data-tone=warn]{background:var(--dsw-alias-state-warn-tertiary);color:var(--dsw-alias-state-warn-label)}
+.mys-tag[data-tone=error]{background:color-mix(in srgb,var(--dsw-alias-state-error-primary) 13%,transparent);color:var(--dsw-alias-state-error-primary)}
+.mys-logs{max-height:200px;overflow:auto;display:flex;flex-direction:column;gap:4px;font-size:12px;line-height:18px;font-family:var(--ds-font-family-code)}
 .mys-log{display:flex;gap:8px}
 .mys-log-time{color:var(--dsw-alias-label-tertiary);flex:none}
-.mys-log[data-level=warn] .mys-log-text{color:#8a5b00}
-.mys-log[data-level=error] .mys-log-text{color:#a3231c}
+.mys-log[data-level=warn] .mys-log-text{color:var(--dsw-alias-state-warn-label)}
+.mys-log[data-level=error] .mys-log-text{color:var(--dsw-alias-state-error-primary)}
 .mys-empty{font-size:12px;color:var(--dsw-alias-label-tertiary)}
 .mys-overlay{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;background:rgba(15,23,42,.45);padding:24px}
-.mys-dialog{box-sizing:border-box;width:min(380px,100%);background:var(--dsw-alias-bg-layer-1,#fff);border-radius:14px;padding:20px;display:flex;flex-direction:column;gap:12px;box-shadow:0 24px 60px rgba(0,0,0,.35);color:var(--dsw-alias-label-primary)}
+.mys-captcha-frame{width:100%;height:420px;border:0;background:#fff;border-radius:8px}
+.mys-dialog form{display:flex;flex-direction:column;gap:12px}
+.mys-dialog{max-height:calc(100dvh - 48px);overflow:auto;box-sizing:border-box;width:min(380px,100%);background:var(--dsw-alias-bg-layer-1,#fff);border-radius:14px;padding:20px;display:flex;flex-direction:column;gap:12px;box-shadow:0 24px 60px rgba(0,0,0,.35);color:var(--dsw-alias-label-primary)}
 .mys-dialog-title{margin:0;font-size:16px;font-weight:600}
-.mys-qr{display:flex;align-items:center;justify-content:center;padding:8px;background:#fff;border-radius:10px;min-height:232px}
-.mys-qr img{width:232px;height:232px;display:block;image-rendering:pixelated}
-.mys-qr-state{font-size:13px;line-height:20px;text-align:center;color:var(--dsw-alias-label-secondary,#4b5563)}
-.mys-dialog-foot{display:flex;gap:8px;justify-content:flex-end}
+.mys-dialog-foot{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end}
 .mys-details{font-size:13px}
 .mys-details summary{cursor:pointer;color:var(--dsw-alias-label-secondary,#4b5563);font-size:13px;line-height:22px}
 .mys-details[open] summary{margin-bottom:8px}
@@ -119,14 +108,14 @@ window.__ModuleLoader__.load({
 .mys-account-name{font-size:14px;font-weight:500;line-height:20px}
 .mys-run{display:flex;flex-direction:column;gap:12px}
 .mys-summary{position:relative;display:flex;align-items:center;gap:14px;box-sizing:border-box;border:.5px solid var(--dsw-alias-border-l2);border-radius:var(--dsw-radius-xl,14px);padding:16px;background:linear-gradient(135deg,color-mix(in srgb,var(--dsw-alias-button-primary-fill,#4d6bfe) 12%,transparent),transparent 62%),var(--dsw-alias-bg-layer-1,transparent)}
-.mys-summary-mark{width:44px;height:44px;flex:none;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;color:#fff;background:var(--dsw-alias-button-primary-fill,#4d6bfe)}
+.mys-summary-mark{width:44px;height:44px;flex:none;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;color:var(--dsw-alias-state-success-primary);background:var(--dsw-alias-state-success-tertiary)}
+.mys-summary-mark[data-done=false]{color:var(--dsw-alias-state-warn-label);background:var(--dsw-alias-state-warn-tertiary)}
 .mys-summary-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
-.mys-summary-title{font-size:18px;font-weight:600;line-height:26px}
 .mys-summary-sub{font-size:12px;line-height:18px;color:var(--dsw-alias-label-secondary)}
 .mys-summary-score{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:4px;text-align:right}
 .mys-summary-count{font-size:30px;font-weight:700;line-height:1;color:var(--dsw-alias-button-primary-fill,#4d6bfe);font-variant-numeric:tabular-nums}
-.mys-summary-badge{font-size:11px;line-height:18px;padding:0 10px;border-radius:999px;background:rgba(34,160,107,.15);color:#177a50}
-.mys-summary-badge[data-done=false]{background:rgba(214,148,0,.16);color:#8a5b00}
+.mys-summary-badge{font-size:11px;line-height:18px;padding:0 10px;border-radius:999px;background:var(--dsw-alias-state-success-tertiary);color:var(--dsw-alias-state-success-primary)}
+.mys-summary-badge[data-done=false]{background:var(--dsw-alias-state-warn-tertiary);color:var(--dsw-alias-state-warn-label)}
 .mys-game{border:.5px solid var(--dsw-alias-border-l2);border-radius:var(--dsw-radius-lg,12px);overflow:hidden;background:var(--dsw-alias-bg-layer-1,transparent)}
 .mys-game-head{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:.5px solid var(--dsw-alias-border-l2);background:color-mix(in srgb,var(--mys-accent,#6b7280) 8%,transparent)}
 .mys-game-bar{width:4px;height:18px;border-radius:2px;flex:none;background:var(--mys-accent,#6b7280)}
@@ -136,29 +125,85 @@ window.__ModuleLoader__.load({
 .mys-game-table th{font-weight:400;color:var(--dsw-alias-label-tertiary);padding:6px 10px;border-bottom:.5px solid var(--dsw-alias-border-l2);text-align:center}
 .mys-game-table td{padding:8px 10px;text-align:center;font-variant-numeric:tabular-nums}
 .mys-status{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--dsw-alias-state-success-primary,#22a06b)}
-.mys-status[data-outcome=captcha],.mys-status[data-outcome=first-bind],.mys-status[data-outcome=not-bound]{color:var(--dsw-alias-state-warn-primary,#8a5b00)}
+.mys-status[data-outcome=captcha],.mys-status[data-outcome=first-bind],.mys-status[data-outcome=not-bound]{color:var(--dsw-alias-state-warn-label)}
 .mys-status[data-outcome=expired],.mys-status[data-outcome=error]{color:var(--dsw-alias-state-error-primary,#a3231c)}
-.mys-status[data-outcome=no-role]{color:var(--dsw-alias-label-tertiary)}
+.mys-status[data-outcome=no-role],.mys-status[data-outcome=skipped]{color:var(--dsw-alias-label-tertiary)}
 .mys-run-foot{text-align:center;font-size:12px;line-height:18px;color:var(--dsw-alias-label-tertiary);padding:2px 0 4px}
-.mys-badge{position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:55;display:flex;align-items:center;gap:8px;max-width:min(560px,calc(100vw - 32px));box-sizing:border-box;padding:6px 10px;border-radius:999px;font-size:12px;line-height:18px;background:#a3231c;color:#fff;box-shadow:0 8px 24px rgba(0,0,0,.28);pointer-events:auto}
+.mys-badge{position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:55;display:flex;align-items:center;gap:8px;max-width:min(560px,calc(100vw - 32px));box-sizing:border-box;padding:6px 10px;border-radius:999px;font-size:12px;line-height:18px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-state-error-primary);border:1px solid var(--dsw-alias-state-error-secondary);pointer-events:auto}
+.mys-badge[data-tone=warn]{color:var(--dsw-alias-state-warn-label);border-color:var(--dsw-alias-state-warn-secondary)}
 .mys-badge-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mys-badge-close{flex:none;border:none;background:transparent;color:inherit;font:inherit;cursor:pointer;opacity:.8;padding:0 2px}
 .mys-badge-close:hover{opacity:1}
 `
 
     const zh = {
+      smsTitle: "短信登录米游社",
+      smsHint: "仅支持中国大陆 +86 手机号。点击发送后才会请求短信；如遇风控，请在下方亲自完成官方验证。不会自动重发。",
+      smsPhone: "手机号（+86）",
+      smsCode: "6 位短信验证码",
+      smsSend: "发送验证码",
+      smsResend: "重新发送",
+      smsSubmit: "验证并登录",
+      smsCancel: "取消",
+      smsBusy: "正在处理，请稍候…",
+      smsBadPhone: "请输入有效的 11 位大陆手机号。",
+      smsBadCode: "请输入 6 位短信验证码。",
+      smsWrongCode: "验证码不正确或已失效，请重新输入。",
+      smsFailed: "请求未完成。请检查状态后重试；若发送结果不明，请先等待短信，不会自动重发。",
+      smsCooldown: "请等待倒计时结束后再发送。",
+      smsRateLimited: "请求过于频繁，请稍后重新登录。",
+      smsOfficialAction: "账号需要官方实名、身份验证或恢复操作。请前往米游社官方客户端处理，再重新登录；插件无法代办。",
+      smsGameValidation: "新登录未保存：游戏凭据只读校验失败。已有登录未被替换，请取消后核对账号并重试。",
+      smsCommunityValidation: "新登录未保存：已启用社区的凭据只读校验失败。已有登录未被替换，请取消后核对账号与社区设置。",
+      smsOutcomeUnknown: "请求可能已经送达，但结果未确认。不会自动重试；请先等待短信或到官方客户端核对，不要立即重复发送。",
+      smsRejected: "官方接口明确拒绝了本次请求。不会自动重试；请取消后检查账号状态，必要时前往官方客户端处理。",
+      smsInvalidResponse: "官方响应格式不符合预期，本次未保存新登录。请取消后检查官方服务状态。",
+      smsNetwork: "未能完成官方接口的只读请求，本次未保存新登录。请检查网络后重试。",
+      smsExpired: "本轮登录已过期，请取消后重新登录。",
+      smsCountdown: "{seconds} 秒后可重新发送",
+      smsCodeSent: "短信已发送，请输入验证码。",
+      smsVerification: "官方人工验证",
+      smsWidgetLoading: "正在加载官方验证…",
+      smsWidgetFailed: "人工验证未完成或加载失败。请取消后重新登录；不会自动发送短信。",
+      smsSuccess: "登录成功，凭据已完成只读校验。",
+      smsSuccessWarning: "游戏凭据校验通过；社区只读校验未通过，请查看社区状态。",
+      communityTitle: "上次大别野签到",
+      communityNoToken: "社区凭据不完整，请重新短信登录；不影响游戏登录。",
+      communityMissingMid: "V2 社区凭据缺少必要信息，请重新短信登录；不影响游戏登录。",
+      communityPartial: "上次大别野签到未完成",
+      communityAccepted: "接口已接受大别野签到；积分到账未独立验证。",
+      communityNoResult: "尚无社区签到记录",
+      communityRisk: "需要人工验证：请在米游社 App 手动处理后再决定是否重试。",
+      communityUnknown: "结果不明：请先在米游社 App 核对，不要盲目重复请求。",
+      communityBalanceFail: "积分查询失败；不代表大别野签到失败。",
+      communityHistorical: "历史积分快照",
+      communityCurrent: "今日查询快照",
+      communityBalance: "米游币余额",
+      communityReceived: "快照当日已获取",
+      communityRemaining: "快照当日剩余",
+      communitySnapshotAt: "查询时间",
+      communityNoBalance: "尚无积分查询快照",
+      communityOutcomeSuccess: "接口已接受",
+      communityOutcomeCached: "本机已记录今日接口接受",
+      communityOutcomeCaptcha: "待人工验证",
+      communityOutcomeUnknown: "结果不明",
+      communityOutcomeAuth: "社区凭据不可用",
+      communityOutcomeExpired: "社区凭据已失效，请重新短信登录",
+      communityOutcomeError: "失败",
+      communityOutcomeSkipped: "未执行",
+      outcomeSkipped: "未执行",
       nav: '米游社',
       title: '米游社签到',
-      intro: '每天在你设定的时间窗口内随机挑一个时刻，为已绑定的米哈游游戏自动签到。登录凭据只保存在本机。',
+      intro: '在同一处选择游戏与大别野签到项目，手动和定时按已保存的项目执行。登录凭据只保存在本机。',
       account: '账号',
-      accountDesc: '使用米游社 App 扫码登录；App 通道会同时获取可自动续期的 SToken。',
-      login: '扫码登录',
-      relogin: '重新扫码',
+      accountDesc: '使用大陆 +86 手机号短信登录。凭据仅保存于本机；SToken 失效后仍需重新登录。',
+      login: '短信登录',
+      relogin: '重新登录',
       refresh: '续期凭据',
       refreshing: '续期中…',
       noStoken: '当前凭据不含 SToken，无法自动续期。',
-      noStokenHint: '重新扫码会走 App 通道，获取可自动续期的 SToken。',
-      upgradeLogin: '重新扫码获取 SToken',
+      noStokenHint: '请重新短信登录获取完整凭据；无法保证长期免登录。',
+      upgradeLogin: '短信登录获取 SToken',
       deleteLogin: '删除登录',
       deleteConfirm: '再次点击确认删除',
       loginDeleted: '登录数据已删除',
@@ -170,15 +215,6 @@ window.__ModuleLoader__.load({
       loginAt: '登录于',
       lastRefresh: '最近续期',
       never: '从未',
-      qrTitle: '扫码登录米游社',
-      qrHint: '打开米游社 App → 右上角扫一扫 → 确认登录。二维码仅在本机生成，不上传。',
-      qrPending: '等待扫码…',
-      qrScanned: '已扫码，请在手机上确认',
-      qrConfirmed: '登录成功，正在校验…',
-      qrExpired: '二维码已过期',
-      qrRefresh: '刷新二维码',
-      qrCancel: '取消',
-      qrChecking: '正在生成二维码…',
       auto: '自动签到',
       autoDesc: '开启后，每天只在时间窗口内执行一次；随机时刻可以避免整点请求特征。',
       enabled: '启用自动签到',
@@ -191,13 +227,29 @@ window.__ModuleLoader__.load({
       nextRun: '下次执行',
       noPlan: '未安排（自动签到未启用）',
       timezone: '时区',
-      games: '游戏',
-      gamesDesc: '只给勾选的游戏签到；角色信息在首次签到或检测时读取。',
       notQueried: '尚未读取角色',
       noRole: '无角色',
       bound: '已绑定',
-      actions: '手动操作',
-      actionsDesc: '签到结果会显示在下方，并写入运行日志。',
+      incompatibleHost: '签到宿主端不兼容。请确认宿主与面板为同一版本，再重新加载页面。',
+      accountChanged: '登录账号或会话已变更。请核对当前账号，再次点击「立即签到」。未自动重试。',
+      saveConflict: '其他面板修改了设置，未保存的更改已放弃。请核对已保存设置，按需重新应用。',
+      saveFeedback: '签到设置保存状态',
+      useSaved: '使用已保存设置',
+      recordNote: '游戏与大别野分别记录，不一定来自同一轮签到。',
+      recordHistorical: '历史记录',
+      coinHeading: '账号米游币快照',
+      projects: '签到项目',
+      projectsDesc: '手动与定时签到使用相同的已保存项目。',
+      dabieye: '大别野（米游币）',
+      dabieyeDesc: '默认关闭；仅签到，不看帖、点赞或分享。',
+      runLoading: '正在加载已保存的签到项目…',
+      runOffline: '无法连接插件宿主端；恢复连接后才能签到。',
+      runBusy: '签到正在进行，请稍候。',
+      runLogin: '请先短信登录。',
+      noTargets: '请至少选中一个签到项目。',
+      staleTargets: '签到项目刚刚变更。请查看更新后的签到项目，确认后再次点击「立即签到」。',
+      targetsChanged: '已保存的签到项目已变更。请查看最新设置，再决定是否签到。未自动重试。',
+      runFailed: '签到请求未确认完成。请查看结果，不要立即重复签到。',
       runNow: '立即签到',
       running: '签到中…',
       verify: '检测接口与登录',
@@ -208,7 +260,7 @@ window.__ModuleLoader__.load({
       colGame: '游戏',
       colResult: '结果',
       colDetail: '说明',
-      noResult: '今天还没有运行记录。',
+      noResult: '尚无游戏签到记录。',
       advanced: '高级设置',
       gap: '游戏间隔（秒）',
       gapMin: '最小',
@@ -219,25 +271,21 @@ window.__ModuleLoader__.load({
       retry: '失败重试',
       retryAttempts: '重试次数',
       retryDelay: '重试间隔（秒）',
-      qrAge: '二维码有效期（秒）',
       logs: '运行日志',
       logsEmpty: '暂无日志。',
       saveOk: '已保存',
-      saveFail: '保存失败',
+      saveFail: '未能确认设置已保存，未保存的编辑已放弃。请核对宿主设置，再重新应用或选择使用已保存设置。',
       saveFailed: '保存失败：{message}',
       loadFailed: '无法连接插件宿主端：{message}',
       hostMissing: '插件宿主端未加载。请重新加载页面；若仍无效，重启 DSH。',
       bannerExpired: '登录状态已失效，自动签到无法继续。',
-      bannerCaptcha: '米游社要求人机验证，今日已停止自动签到。',
+      bannerCaptcha: '签到因人工验证停止。请在米游社 App 手动完成验证，再决定是否重试。',
       bannerRun: '最近一次签到失败。',
-      retryRun: '重试签到',
       verifyOk: '接口可用，登录有效（{ms}ms）',
       verifyAnon: '尚未登录，无法检测登录状态。',
       verifyFail: '网络不可达：{message}',
       verifyInvalid: '接口可用，但登录无效：{message}',
-      detectorOk: '二维码自检通过（浏览器可识别）',
-      detectorFail: '浏览器未能识别该二维码，建议刷新二维码后重试',
-      detectorUnavailable: '浏览器未提供二维码自检能力',
+      verifyUnavailable: '未能确认接口或登录状态，请稍后再检测。',
       riskTitle: '降低被风控的建议',
       riskList: '1) 每天只签一次，不要频繁手动补签。2) 保持固定的 device_id：本插件首次运行后不再更改，请不要删除状态文件。3) 不要在同一台机器上用同一个 DSH 反复登录多个账号。4) 触发验证码时先在米游社 App 内手动完成，不要连续重试。5) 网络出口尽量稳定，避免频繁更换 IP 或代理。',
       outcomeSigned: '成功',
@@ -265,12 +313,11 @@ window.__ModuleLoader__.load({
       badgeOpen: '在左侧栏「米游社签到」中处理',
       panel: '米游社签到',
       taskPanelTitle: '米游社签到',
-      taskPanelIntro: '每天在设定窗口内随机时刻为已绑定的米哈游游戏签到；登录、时间窗口、游戏与高级参数都在这里管理。',
       taskName: '每日签到',
       taskFrequency: '运行频率',
       taskRandom: '（窗口内随机）',
       taskNextRun: '下次运行',
-      taskLastRun: '上次运行',
+      taskLastRun: '最近游戏签到',
       taskPause: '暂停',
       taskResume: '启用',
       taskRunHistory: '运行记录',
@@ -281,8 +328,8 @@ window.__ModuleLoader__.load({
       taskStateExpired: '登录已失效',
       taskResumed: '已启用自动签到',
       taskPaused: '已暂停自动签到',
-      runTitle: '米游社游戏签到',
-      runSigned: '今日共签到',
+      runTitle: '上次游戏签到',
+      runSigned: '该记录签到成功',
       runAccounts: '个账号',
       runAuto: '是否自动签到',
       runAt: '签到时间',
@@ -290,28 +337,83 @@ window.__ModuleLoader__.load({
       runPartial: '未完成',
       runAccountUnit: '个账号',
       colStatus: '签到状态',
-      colReward: '今日奖励',
+      colReward: '签到奖励',
       colTotal: '累计签到',
-      runFooterDone: '所有账号今日签到已全部完成，记得明天再来哦！',
-      runFooterPartial: '部分账号还没完成，请看上方状态。',
+      runFooterDone: '该游戏记录中的项目已完成。',
+      runFooterPartial: '该游戏记录并未全部完成，请查看各项目结果。',
       yes: '是',
       no: '否',
       outcomeFirstBind: '待手动签到',
     }
 
     const en = {
+      smsTitle: "Sign in to miHoYo by SMS",
+      smsHint: "Mainland China +86 numbers only. SMS is requested only when you press Send. Complete any official verification below yourself. No automatic resend.",
+      smsPhone: "Mobile number (+86)",
+      smsCode: "6-digit SMS code",
+      smsSend: "Send code",
+      smsResend: "Resend code",
+      smsSubmit: "Verify and sign in",
+      smsCancel: "Cancel",
+      smsBusy: "Processing…",
+      smsBadPhone: "Enter a valid 11-digit mainland China mobile number.",
+      smsBadCode: "Enter the 6-digit SMS code.",
+      smsWrongCode: "The code is incorrect or expired. Please enter it again.",
+      smsFailed: "The request did not complete. Check the state before retrying. If delivery is uncertain, wait for the SMS; it is never resent automatically.",
+      smsCooldown: "Wait for the countdown before sending again.",
+      smsRateLimited: "Too many requests. Please sign in again later.",
+      smsOfficialAction: "Official identity verification or account recovery is required. Use the official app, then start again; this plugin cannot perform it for you.",
+      smsGameValidation: "New login not saved: read-only game credential validation failed. Existing login unchanged. Cancel, check the account and try again.",
+      smsCommunityValidation: "New login not saved: required community credential validation failed. Existing login unchanged. Cancel and check the account and community settings.",
+      smsOutcomeUnknown: "The request may have arrived, but its result is unknown. No automatic retry. Wait for the SMS or check the official app; do not immediately send again.",
+      smsRejected: "The official API rejected this request. No automatic retry. Cancel and check the account in the official app if needed.",
+      smsInvalidResponse: "Unexpected official response. New login not saved. Cancel and check the official service status.",
+      smsNetwork: "The official read-only request could not complete. New login not saved. Check your network before retrying.",
+      smsExpired: "This login expired. Cancel and start again.",
+      smsCountdown: "Resend available in {seconds}s",
+      smsCodeSent: "SMS sent. Enter the verification code.",
+      smsVerification: "Official manual verification",
+      smsWidgetLoading: "Loading official verification…",
+      smsWidgetFailed: "Verification was not completed or could not load. Cancel and sign in again. No SMS was sent automatically.",
+      smsSuccess: "Signed in; read-only credential checks passed.",
+      smsSuccessWarning: "Game credentials verified; the community check did not pass. See community status.",
+      communityTitle: "Last Dabieye check-in",
+      communityNoToken: "Community credentials are incomplete. Sign in again by SMS; game login is unaffected.",
+      communityMissingMid: "Required V2 community credentials are missing. Sign in again by SMS; game login is unaffected.",
+      communityPartial: "Dabieye check-in did not complete",
+      communityAccepted: "The Dabieye check-in was accepted; coin credit has not been independently verified.",
+      communityNoResult: "No community check-in record yet",
+      communityRisk: "Manual verification is required. Complete it in the Miyoushe App before deciding whether to retry.",
+      communityUnknown: "Unknown result. Check in the Miyoushe App before retrying; do not blindly resend.",
+      communityBalanceFail: "Coin query failed; community check-in may still have succeeded.",
+      communityHistorical: "Historical coin snapshot",
+      communityCurrent: "Snapshot queried today",
+      communityBalance: "Coin balance",
+      communityReceived: "Received on snapshot day",
+      communityRemaining: "Remaining on snapshot day",
+      communitySnapshotAt: "Queried at",
+      communityNoBalance: "No coin snapshot yet",
+      communityOutcomeSuccess: "Request accepted",
+      communityOutcomeCached: "Acceptance recorded locally today",
+      communityOutcomeCaptcha: "Manual verification required",
+      communityOutcomeUnknown: "Unknown result",
+      communityOutcomeAuth: "Community credentials unavailable",
+      communityOutcomeExpired: "Community credentials expired; sign in again by SMS",
+      communityOutcomeError: "Failed",
+      communityOutcomeSkipped: "Not executed",
+      outcomeSkipped: "Not executed",
       nav: 'miHoYo',
       title: 'miHoYo check-in',
-      intro: 'Signs in to your bound miHoYo games once a day at a random moment inside your windows. Credentials stay on this machine.',
+      intro: 'Choose games and Dabieye in one place. Manual and scheduled check-ins use your saved selection. Credentials stay on this device.',
       account: 'Account',
-      accountDesc: 'Scan the QR code with the miHoYo app; the app channel also fetches a renewable SToken.',
-      login: 'Scan to sign in',
-      relogin: 'Scan again',
+      accountDesc: 'Sign in with a mainland China +86 mobile number. Credentials stay on this device; an expired SToken requires signing in again.',
+      login: 'Sign in by SMS',
+      relogin: 'Sign in again',
       refresh: 'Refresh credentials',
       refreshing: 'Refreshing…',
       noStoken: 'This credential has no SToken, so it cannot be renewed automatically.',
-      noStokenHint: 'Scan again to use the app channel and obtain one.',
-      upgradeLogin: 'Scan again for SToken',
+      noStokenHint: 'Sign in again by SMS to obtain complete credentials. Permanent login is not guaranteed.',
+      upgradeLogin: 'Sign in by SMS for SToken',
       deleteLogin: 'Delete login',
       deleteConfirm: 'Click again to delete',
       loginDeleted: 'Login data deleted',
@@ -323,15 +425,6 @@ window.__ModuleLoader__.load({
       loginAt: 'Signed in',
       lastRefresh: 'Last refresh',
       never: 'never',
-      qrTitle: 'Sign in to miHoYo',
-      qrHint: 'Open the miHoYo app → Scan → Confirm. The QR code is generated locally.',
-      qrPending: 'Waiting for scan…',
-      qrScanned: 'Scanned — confirm on your phone',
-      qrConfirmed: 'Signed in, verifying…',
-      qrExpired: 'The QR code expired',
-      qrRefresh: 'New QR code',
-      qrCancel: 'Cancel',
-      qrChecking: 'Generating QR code…',
       auto: 'Automatic check-in',
       autoDesc: 'Runs once a day inside a window; the random moment avoids on-the-hour patterns.',
       enabled: 'Enable automatic check-in',
@@ -344,13 +437,29 @@ window.__ModuleLoader__.load({
       nextRun: 'Next run',
       noPlan: 'Not scheduled (automatic check-in is off)',
       timezone: 'Time zone',
-      games: 'Games',
-      gamesDesc: 'Only checked games are signed. Roles are read on the first run or check.',
       notQueried: 'Roles not read yet',
       noRole: 'No character',
       bound: 'Bound',
-      actions: 'Manual actions',
-      actionsDesc: 'Results appear below and in the run log.',
+      incompatibleHost: 'Incompatible check-in host. Make sure the panel and host are the same version, then reload the page.',
+      accountChanged: 'The account or session changed. Review the current account and click Check in now again. No retry was sent.',
+      saveConflict: 'Settings changed in another panel. Your unsaved edits were discarded. Review the saved settings and reapply your edits if needed.',
+      saveFeedback: 'Check-in settings save status',
+      useSaved: 'Use saved settings',
+      recordNote: 'Games and Dabieye are recorded independently and may not be from the same run.',
+      recordHistorical: 'Historical record',
+      coinHeading: 'Account coin snapshot',
+      projects: 'Check-in targets',
+      projectsDesc: 'Manual and scheduled check-ins use the same saved targets.',
+      dabieye: 'Dabieye (coins)',
+      dabieyeDesc: 'Off by default. Check-in only: no reading, liking or sharing posts.',
+      runLoading: 'Loading saved check-in targets…',
+      runOffline: 'Cannot reach the plugin host. Reconnect before checking in.',
+      runBusy: 'A check-in is in progress. Please wait.',
+      runLogin: 'Sign in by SMS first.',
+      noTargets: 'Select at least one check-in target.',
+      staleTargets: 'The targets just changed. Review the updated selection, then click Check in now again.',
+      targetsChanged: 'The saved targets changed. Review the latest settings before checking in. The request was not retried.',
+      runFailed: 'The check-in request did not confirm completion. Review the results before trying again.',
       runNow: 'Check in now',
       running: 'Checking in…',
       verify: 'Test connection and session',
@@ -361,7 +470,7 @@ window.__ModuleLoader__.load({
       colGame: 'Game',
       colResult: 'Result',
       colDetail: 'Detail',
-      noResult: 'Nothing has run today yet.',
+      noResult: 'No game check-in record yet.',
       advanced: 'Advanced',
       gap: 'Gap between games (s)',
       gapMin: 'min',
@@ -372,25 +481,21 @@ window.__ModuleLoader__.load({
       retry: 'Retry',
       retryAttempts: 'Attempts',
       retryDelay: 'Delay (s)',
-      qrAge: 'QR lifetime (s)',
       logs: 'Run log',
       logsEmpty: 'No log entries yet.',
       saveOk: 'Saved',
-      saveFail: 'Save failed',
+      saveFail: 'The save could not be confirmed. Your draft was discarded. Review the host settings and reapply your edits or use the saved settings.',
       saveFailed: 'Save failed: {message}',
       loadFailed: 'Cannot reach the plugin host: {message}',
       hostMissing: 'The plugin host is not loaded. Reload the page, and restart DSH if this persists.',
       bannerExpired: 'The session expired; automatic check-in cannot continue.',
-      bannerCaptcha: 'miHoYo asked for human verification; today\'s run stopped.',
+      bannerCaptcha: 'Check-in stopped for human verification. Complete it manually in the Miyoushe App before deciding whether to retry.',
       bannerRun: 'The last check-in failed.',
-      retryRun: 'Retry',
       verifyOk: 'API reachable, session valid ({ms}ms)',
       verifyAnon: 'Not signed in; nothing to verify.',
       verifyFail: 'Network unreachable: {message}',
       verifyInvalid: 'API reachable but the session is invalid: {message}',
-      detectorOk: 'QR self-check passed (decoded by the browser)',
-      detectorFail: 'The browser could not decode this QR code; refresh it',
-      detectorUnavailable: 'This browser offers no QR self-check',
+      verifyUnavailable: 'Could not confirm the connection or session. Check again later.',
       riskTitle: 'Lowering risk-control flags',
       riskList: '1) One run per day; avoid repeated manual retries. 2) Keep the device id stable: it never changes after first use, so do not delete the state file. 3) Do not sign several accounts in from the same device. 4) When a captcha appears, clear it in the miHoYo app instead of retrying. 5) Keep the network egress stable; avoid hopping IPs or proxies.',
       outcomeSigned: 'Signed',
@@ -418,12 +523,11 @@ window.__ModuleLoader__.load({
       badgeOpen: 'Resolve it in the sidebar panel “miHoYo check-in”',
       panel: 'miHoYo check-in',
       taskPanelTitle: 'miHoYo check-in',
-      taskPanelIntro: 'Signs in to your bound games once a day at a random moment inside your windows; account, windows, games and advanced options are all managed here.',
       taskName: 'Daily check-in',
       taskFrequency: 'Schedule',
       taskRandom: ' (random inside the window)',
       taskNextRun: 'Next run',
-      taskLastRun: 'Last run',
+      taskLastRun: 'Last game check-in',
       taskPause: 'Pause',
       taskResume: 'Resume',
       taskRunHistory: 'Run history',
@@ -434,8 +538,8 @@ window.__ModuleLoader__.load({
       taskStateExpired: 'Session expired',
       taskResumed: 'Automatic check-in resumed',
       taskPaused: 'Automatic check-in paused',
-      runTitle: 'miHoYo game check-in',
-      runSigned: 'Signed in today:',
+      runTitle: 'Last game check-in',
+      runSigned: 'Successful in this record:',
       runAccounts: 'accounts',
       runAuto: 'Automatic',
       runAt: 'At',
@@ -443,10 +547,10 @@ window.__ModuleLoader__.load({
       runPartial: 'Incomplete',
       runAccountUnit: ' accounts',
       colStatus: 'Status',
-      colReward: 'Today reward',
+      colReward: 'Reward',
       colTotal: 'Total days',
-      runFooterDone: 'All accounts are signed in for today — see you tomorrow!',
-      runFooterPartial: 'Some accounts are not finished; see the status above.',
+      runFooterDone: 'The targets in this game record were completed.',
+      runFooterPartial: 'This game record is incomplete. See the individual results.',
       yes: 'yes',
       no: 'no',
       outcomeFirstBind: 'Manual first sign-in',
@@ -471,6 +575,7 @@ window.__ModuleLoader__.load({
       expired: 'outcomeExpired',
       'not-bound': 'outcomeNotBound',
       'first-bind': 'outcomeFirstBind',
+      skipped: 'outcomeSkipped',
       error: 'outcomeError',
     }
 
@@ -501,7 +606,7 @@ window.__ModuleLoader__.load({
     async function callJson(path, init) {
       const body = await requestJson(path, init)
       if (body !== null && typeof body === 'object' && body.ok === false) {
-        throw new Error(body.error?.message ?? 'request failed')
+        throw Object.assign(new Error(body.error?.message ?? 'request failed'), { code: body.error?.code })
       }
       return body
     }
@@ -572,37 +677,18 @@ window.__ModuleLoader__.load({
         .join('、')
     }
 
-    /**
-     * One action button.
-     *
-     * `variant` is the plugin's vocabulary (`primary` / `danger` / `outline`);
-     * it maps onto DSH's own variants, and the built-in Button renders it.
-     * Without the primitives module (older shell) the fallback keeps the same
-     * geometry so the row layout does not jump.
-     */
+    // Local semantic controls; DS styles are shared through theme tokens only.
     function Button({ variant = 'outline', size = 'md', className, children, ...rest }) {
       const mapped = variant === 'primary' ? 'primary' : variant === 'danger' ? 'ghost' : 'outline'
-      const extra = variant === 'danger' ? 'mys-danger-text' : undefined
-      const merged = [extra, className].filter(Boolean).join(' ')
-      if (PrimitiveButton !== null) {
-        return h(PrimitiveButton, {
-          variant: mapped,
-          size,
-          ...(merged === '' ? {} : { className: merged }),
-          ...rest,
-          children,
-        })
-      }
       return h('button', {
         type: 'button',
         ...rest,
-        className: ['mys-btn', `mys-btn-${mapped}`, size === 'sm' ? 'mys-btn-sm' : '', merged].filter(Boolean).join(' '),
+        className: ['mys-btn', `mys-btn-${mapped}`, size === 'sm' ? 'mys-btn-sm' : '', variant === 'danger' && 'mys-danger-text', className].filter(Boolean).join(' '),
         children,
       })
     }
 
-    /** Fallback switch, used only when the shell has no primitives module. */
-    function FallbackSwitch({ checked, onChange, label, disabled }) {
+    function Switch({ checked, onChange, label, disabled }) {
       return h('button', {
         type: 'button',
         role: 'switch',
@@ -610,228 +696,502 @@ window.__ModuleLoader__.load({
         'aria-label': label,
         disabled: disabled === true,
         className: 'mys-switch',
-        onClick: () => onChange(!checked),
+        onClick: () => { if (!disabled) onChange(!checked) },
       }, h('span', { className: 'mys-knob', 'aria-hidden': true }))
     }
 
-    function Switch(props) {
-      if (PrimitiveSwitch !== null) {
-        return h(PrimitiveSwitch, {
-          checked: props.checked === true,
-          label: props.label,
-          ...(props.disabled === true ? { disabled: true } : {}),
-          onChange: props.onChange,
-        })
-      }
-      return h(FallbackSwitch, props)
-    }
-
-    function Card({ title, desc, children }) {
-      return h('section', { className: 'mys-card' },
+    function Card({ title, desc, id, children }) {
+      return h('section', { className: 'mys-card', 'aria-labelledby': id && title ? `${id}-title` : undefined, 'aria-describedby': id && desc ? `${id}-desc` : undefined },
         (title || desc) ? h('div', { className: 'mys-card-head' },
           h('div', { className: 'mys-card-head-text' },
-            title ? h('div', { className: 'mys-card-title' }, title) : null,
-            desc ? h('div', { className: 'mys-card-desc' }, desc) : null),
-          null) : null,
+            title ? h(id ? 'h2' : 'div', { className: 'mys-card-title', id: id ? `${id}-title` : undefined }, title) : null,
+            desc ? h('div', { className: 'mys-card-desc', id: id ? `${id}-desc` : undefined }, desc) : null)) : null,
         children)
+    }
+
+    const COMMUNITY_ZONE = 'Asia/Shanghai'
+    const gameCaptcha = (code) => code === 'CAPTCHA' || code === 'CAPTCHA_REQUIRED'
+
+    function scopeTime(at, zone, includeTime = false) {
+      if (!Number.isFinite(at) || !Number.isFinite(new Date(at).getTime())) return null
+      const parts = new Intl.DateTimeFormat('en-GB', {
+        timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit',
+        ...(includeTime && { hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23' }),
+      }).formatToParts(new Date(at))
+      const pick = (type) => parts.find((part) => part.type === type)?.value
+      const day = [pick('year'), pick('month'), pick('day')].join('-')
+      return includeTime ? `${day} ${[pick('hour'), pick('minute'), pick('second')].join(':')}` : day
+    }
+
+    function recordTime(record, zone, day, t) {
+      // Compare the record's own business day, never infer shared run membership.
+      try {
+        const when = scopeTime(record.at, zone, true)
+        const historical = (day ?? when?.slice(0, 10)) < scopeTime(Date.now(), zone)
+        return `${when ?? day ?? '—'} (${zone})${historical ? ` · ${t('recordHistorical')}` : ''}`
+      } catch { return formatTime(record.at) }
+    }
+
+    function CommunityResults({ t, community = {} }) {
+      const results = community.lastResult?.results ?? []
+      const outcomes = {
+        success: 'communityOutcomeSuccess', 'cached-success': 'communityOutcomeCached', captcha: 'communityOutcomeCaptcha',
+        unknown: 'communityOutcomeUnknown', 'auth-unavailable': 'communityOutcomeAuth', expired: 'communityOutcomeExpired',
+        error: 'communityOutcomeError', skipped: 'communityOutcomeSkipped',
+      }
+      return h(Card, { title: t('communityTitle'), id: 'mys-community-record' },
+        h('div', { role: 'status', className: 'mys-meta' }, community.lastResult
+          ? t(community.lastResult.ok ? 'communityAccepted' : 'communityPartial') : t('communityNoResult')),
+        community.lastResult ? h('div', { className: 'mys-meta' }, recordTime(community.lastResult, COMMUNITY_ZONE, community.lastResult.day, t)) : null,
+        results.map((item, index) => h('div', { className: 'mys-row', key: item.gid + '-' + index },
+          h('div', { className: 'mys-row-label' },
+            h('div', null, item.label ?? item.gid), h('div', { className: 'mys-row-desc' }, item.message)),
+          h('span', { className: 'mys-tag', 'data-tone': ['success', 'cached-success'].includes(item.outcome) ? 'ok' : item.outcome === 'skipped' ? '' : 'warn' }, t(outcomes[item.outcome] ?? 'communityOutcomeError')))),
+        community.lastError?.code === 'captcha' || results.some((item) => item.outcome === 'captcha')
+          ? h('div', { className: 'mys-banner', 'data-tone': 'warn', role: 'status' }, t('communityRisk')) : null,
+        community.uncertainAttempt || community.lastError?.code === 'unknown' || results.some((item) => item.outcome === 'unknown')
+          ? h('div', { className: 'mys-banner', 'data-tone': 'warn', role: 'status' }, t('communityUnknown')) : null,
+        community.lastError && !['captcha', 'unknown'].includes(community.lastError.code)
+          ? h('div', { className: 'mys-hint', role: 'status' }, community.lastError.message) : null)
+    }
+
+    function CoinSnapshot({ t, balance, balanceError }) {
+      const current = balance?.day === scopeTime(Date.now(), COMMUNITY_ZONE) && !balanceError
+      const number = (value) => typeof value === 'number' && Number.isFinite(value) ? String(value) : '—'
+      return h('section', { className: 'mys-card', 'aria-labelledby': 'mys-coin-heading' },
+        h('h2', { id: 'mys-coin-heading' }, t('coinHeading')),
+        balanceError ? h('div', { role: 'status', className: 'mys-hint' }, t('communityBalanceFail'), ' ', balanceError.message) : null,
+        balance ? h('div', { className: 'mys-meta' },
+          h('div', null, t(current ? 'communityCurrent' : 'communityHistorical'), ' · ', balance.day ?? '—'),
+          h('div', null, t('communityBalance'), '：', number(balance.totalPoints)),
+          h('div', null, t('communityReceived'), '：', number(balance.todayReceived), ' · ', t('communityRemaining'), '：', number(balance.todayRemaining)),
+          h('div', null, t('communitySnapshotAt'), '：', recordTime(balance, COMMUNITY_ZONE, balance.day, t))) : h('div', { className: 'mys-meta' }, t('communityNoBalance')))
     }
 
     function StatusDot({ state }) {
       return h('span', { className: 'mys-dot', 'data-state': state, 'aria-hidden': true })
     }
 
-    function useDetector(src) {
-      const [state, setState] = useState('idle')
-      useEffect(() => {
-        if (!src) return undefined
-        if (typeof BarcodeDetector === 'undefined') {
-          setState('unavailable')
-          return undefined
-        }
-        let cancelled = false
-        const image = new Image()
-        image.onload = () => {
-          const canvas = document.createElement('canvas')
-          canvas.width = image.naturalWidth
-          canvas.height = image.naturalHeight
-          const context = canvas.getContext('2d')
-          if (context === null) {
-            setState('unavailable')
-            return
-          }
-          context.drawImage(image, 0, 0)
-          let detector
+    const validRevision = (value) => typeof value === 'string'
+      && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(value)
+    const compatible = (data) => data?.ok === true && data.checkinProtocol === 1
+      && validRevision(data.configRevision) && validRevision(data.accountRevision)
+      && data.config && typeof data.config === 'object' && !Array.isArray(data.config)
+
+    /** The base of a dirty draft moves only with this queue's own successful saves. */
+    function createConfigSaveQueue({ save, changed, initial = null }) {
+      let confirmed = initial
+      let revision = 0, pending = false, failed = null, queued = null, draining = null
+      const view = () => ({ pending, failed, confirmed })
+      const markEdited = () => {
+        revision++
+        pending = true
+        failed = null
+        changed()
+        return revision
+      }
+      const observe = (snapshot) => {
+        if (!pending) confirmed = snapshot
+      }
+      const acceptSaved = () => {
+        failed = null
+        changed()
+      }
+      const drain = async () => {
+        while (queued !== null) {
+          const job = queued
+          queued = null
+          if (job.revision !== revision) continue
           try {
-            detector = new BarcodeDetector({ formats: ['qr_code'] })
-          } catch {
-            setState('unavailable')
-            return
+            confirmed = await save(job.next, confirmed?.configRevision)
+            if (job.revision === revision) pending = false
+            changed()
+          } catch (failure) {
+            // Neither the failed full draft nor newer snapshots derived from it
+            // may be replayed after observing another panel's settings.
+            revision++
+            queued = null
+            pending = false
+            failed = failure?.code === 'config-conflict' ? 'saveConflict' : 'saveFail'
+            await changed()
           }
-          detector.detect(canvas)
-            .then((codes) => {
-              if (!cancelled) setState(codes.length > 0 ? 'ok' : 'fail')
-            })
-            .catch(() => {
-              if (!cancelled) setState('fail')
-            })
         }
-        image.onerror = () => {
-          if (!cancelled) setState('fail')
-        }
-        image.src = src
-        return () => {
-          cancelled = true
-        }
-      }, [src])
-      return state
+        draining = null
+      }
+      const submit = (next, edited = markEdited()) => {
+        if (edited !== revision) return draining
+        queued = { next, revision: edited }
+        draining ??= Promise.resolve().then(drain)
+        return draining
+      }
+      return { markEdited, submit, observe, acceptSaved, view }
     }
 
-    /** Shared status polling: the settings page and the task panel read one payload. */
-    function useMysStatus(onData, initialStatus) {
-      const [status, setStatus] = useState(initialStatus ?? null)
-      const [error, setError] = useState(null)
-      const runningRef = useRef(false)
-      const onDataRef = useRef(onData)
-      onDataRef.current = onData
+    function postJson(path, body) {
+      return callJson(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+    }
 
-      useEffect(() => {
-        runningRef.current = status?.running === true
-      }, [status?.running])
-
-      const refresh = useCallback(async () => {
+    // Own the status/selection used by both rendering and the click callback.
+    function createCheckinPanel({ initialStatus = null, changed }) {
+      let status = initialStatus, draft = compatible(status) ? status.config : null, error = null
+      let running = false, runIssue = null, needsRefresh = false, readVersion = 0, timer = null
+      const canEdit = () => compatible(status) && error === null && !needsRefresh && draft !== null
+      const saves = createConfigSaveQueue({
+        initial: compatible(status) ? status : null,
+        async save(config, configRevision) {
+          if (!canEdit()) throw new Error('Host unavailable')
+          const data = await postJson('config/checkin', { config, configRevision })
+          if (data?.ok !== true || !compatible(data.status) || data.status.configRevision === configRevision) throw new Error('Invalid check-in configuration response')
+          // Invalidate any older status read still in flight.
+          readVersion++
+          status = data.status
+          error = null
+          return data.status
+        },
+        changed() {
+          const { pending, failed, confirmed } = saves.view()
+          if (failed) {
+            clearTimeout(timer)
+            draft = null
+            needsRefresh = true
+            changed()
+            return refresh()
+          }
+          if (!pending) draft = confirmed?.config ?? null
+          changed()
+        },
+      })
+      async function refresh() {
+        const version = ++readVersion
         try {
           const data = await callJson('status')
-          setStatus(data)
-          setError(null)
-          if (typeof onDataRef.current === 'function') onDataRef.current(data)
+          if (version !== readVersion) return
+          status = data
+          error = null
+          needsRefresh = false
+          saves.observe(compatible(data) ? data : null)
+          if (!saves.view().pending) draft = compatible(data) ? data.config : null
         } catch (failure) {
-          const message = String(failure?.message ?? failure)
-          setError(message === 'host-missing' ? 'host-missing' : message)
+          if (version !== readVersion) return
+          error = String(failure?.message ?? failure)
         }
-      }, [])
-
-      useEffect(() => {
-        let stopped = false
-        let timer
-        const tick = async () => {
+        changed()
+      }
+      function patchDraft(mutate) {
+        if (!canEdit()) return
+        draft = mutate(structuredClone(draft))
+        const edited = saves.markEdited()
+        const next = draft
+        clearTimeout(timer)
+        timer = setTimeout(() => {
+          timer = null
+          return saves.submit(next, edited)
+        }, 650)
+      }
+      function selection() {
+        const { pending, failed, confirmed } = saves.view()
+        const targets = {
+          gameIds: Object.entries(confirmed?.config.games ?? {}).filter(([, enabled]) => enabled === true).map(([id]) => id),
+          dabieye: confirmed?.config.community?.enabled === true,
+          accountRevision: confirmed?.accountRevision,
+        }
+        const blocked = error !== null ? 'runOffline'
+          : status !== null && !compatible(status) ? 'incompatibleHost'
+            : running || status?.running === true ? 'runBusy'
+              : pending ? 'saving'
+                : failed ? failed
+                  : confirmed === null || needsRefresh ? 'runLoading'
+                    : !targets.gameIds.length && !targets.dabieye ? 'noTargets'
+                      : !status?.login || status.login.state === 'anonymous' ? 'runLogin' : null
+        return { targets, blocked }
+      }
+      async function runNow(renderedTargets) {
+        const { targets, blocked } = selection()
+        if (blocked !== null) return
+        // A poll can update the controller before React renders the new view.
+        // Both targets and account must be the ones the button displayed.
+        if (renderedTargets.accountRevision !== targets.accountRevision
+          || renderedTargets.dabieye !== targets.dabieye
+          || renderedTargets.gameIds.length !== targets.gameIds.length
+          || !renderedTargets.gameIds.every((id) => targets.gameIds.includes(id))) {
+          runIssue = renderedTargets.accountRevision !== targets.accountRevision ? 'accountChanged' : 'staleTargets'
+          changed()
+          return
+        }
+        running = true
+        runIssue = null
+        changed()
+        try {
+          const response = await postJson('run/checkin', targets)
+          if (response?.ok !== true || response.started !== true) throw new Error('Check-in start was not confirmed')
+        } catch (failure) {
+          if (['targets-changed', 'account-changed'].includes(failure?.code)) {
+            needsRefresh = true
+            runIssue = failure.code === 'account-changed' ? 'accountChanged' : 'targetsChanged'
+          } else {
+            runIssue = 'runFailed'
+          }
+          changed()
+        } finally {
           await refresh()
-          if (stopped) return
-          timer = setTimeout(tick, runningRef.current ? 1500 : 4000)
+          running = false
+          changed()
+        }
+      }
+      return {
+        patchDraft, refresh, runNow,
+        acceptSaved: () => { if (canEdit()) saves.acceptSaved() },
+        cancelDebounce: () => clearTimeout(timer),
+        view: () => {
+          const { targets, blocked } = selection()
+          const { pending, failed } = saves.view()
+          return { status, error, draft: canEdit() ? draft : null, canEdit: canEdit(), runIssue, targets, runBlocked: blocked, saveFeedback: failed ?? (pending ? 'saving' : null) }
+        },
+      }
+    }
+
+    function useCheckinPanel(initialStatus) {
+      const [, render] = useState(0)
+      const [panel] = useState(() => createCheckinPanel({ initialStatus, changed: () => render((revision) => revision + 1) }))
+      useEffect(() => {
+        let stopped = false, timer
+        async function tick() {
+          await panel.refresh()
+          if (!stopped) timer = setTimeout(tick, panel.view().status?.running ? 1500 : 4000)
         }
         void tick()
         return () => {
           stopped = true
-          if (timer !== undefined) clearTimeout(timer)
-        }
-      }, [refresh])
-
-      return { status, error, refresh }
-    }
-
-    /** Shared QR login flow, used by both the settings section and the task panel. */
-    function useMysLogin({ t, refresh, onNotice }) {
-      const [qr, setQr] = useState(null)
-      const [busy, setBusy] = useState(false)
-      const refreshRef = useRef(refresh)
-      refreshRef.current = refresh
-      const noticeRef = useRef(onNotice)
-      noticeRef.current = onNotice
-
-      const startLogin = useCallback(async () => {
-        setBusy(true)
-        try {
-          const data = await callJson('login/start', {
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body: '{}',
-          })
-          setQr({ ticket: data.ticket, src: data.qr, state: 'pending' })
-        } catch (failure) {
-          noticeRef.current?.(fill(t('saveFailed'), { message: String(failure?.message ?? failure) }))
-        } finally {
-          setBusy(false)
-        }
-      }, [t])
-
-      useEffect(() => {
-        if (qr === null) return undefined
-        let stopped = false
-        let finished = false
-        let timer
-        const tick = async () => {
-          try {
-            const body = await requestJson(`login/poll?ticket=${encodeURIComponent(qr.ticket)}`)
-            if (stopped) return
-            if (body.state === 'expired') {
-              finished = true
-              setQr((current) => (current === null ? null : { ...current, state: 'expired' }))
-            } else if (body?.ok === false) {
-              finished = true
-              setQr((current) => (current === null ? null : { ...current, state: 'error', message: body.error?.message }))
-            } else if (body.state === 'confirmed') {
-              finished = true
-              setQr(null)
-              noticeRef.current?.(body.warning ? String(body.warning) : t('qrConfirmed'))
-              void refreshRef.current?.()
-            } else if (body.state === 'error') {
-              finished = true
-              setQr((current) => (current === null ? null : { ...current, state: 'error', message: body.error?.message }))
-            } else {
-              setQr((current) => (current === null ? null : { ...current, state: body.state }))
-            }
-          } catch (failure) {
-            if (!stopped) {
-              finished = true
-              setQr((current) => (current === null ? null : { ...current, state: 'error', message: String(failure?.message ?? failure) }))
-            }
-          } finally {
-            if (!stopped && !finished) timer = setTimeout(tick, 2200)
-          }
-        }
-        timer = setTimeout(tick, 900)
-        return () => {
-          stopped = true
           clearTimeout(timer)
+          panel.cancelDebounce()
         }
-      }, [qr?.ticket])
-
-      const cancelLogin = useCallback(async () => {
-        setQr(null)
-        try {
-          await callJson('login/cancel', { method: 'POST', body: '{}' })
-        } catch {
-          /* the local dialog is closed either way */
-        }
-      }, [])
-
-      return { qr, busy, startLogin, cancelLogin }
+      }, [panel])
+      return panel
     }
 
-    function QrDialog({ t, session, onRefresh, onClose, detector }) {
-      const state = session.state
-      const label = state === 'scanned' ? t('qrScanned')
-        : state === 'expired' ? t('qrExpired')
-        : state === 'confirmed' ? t('qrConfirmed')
-        : state === 'error' ? (session.message ?? t('qrExpired'))
-        : t('qrPending')
-      return h('div', {
-        className: 'mys-overlay',
-        role: 'dialog',
-        'aria-modal': 'true',
-        'aria-label': t('qrTitle'),
-        onClick: (event) => {
-          if (event.target === event.currentTarget) onClose()
+    /** Memory-only callbacks, shared by the account and community login CTAs. */
+    function createSmsController({ request, changed, confirmed, now = Date.now }) {
+      let state = null, generation = 0, revision = 0, locked = false
+      const publish = () => changed(state && { ...state })
+      const cancelId = (flowId) => { if (flowId) void request('login/cancel', { flowId }).catch(() => {}) }
+      const errorKey = (code) => ({ 'sms-code-invalid': 'smsWrongCode', 'sms-cooldown': 'smsCooldown', 'flow-expired': 'smsExpired', 'flow-changed': 'smsExpired', 'rate-limited': 'smsRateLimited', 'challenge-expired': 'smsExpired', 'official-action-required': 'smsOfficialAction', 'game-validation-failed': 'smsGameValidation', 'community-validation-failed': 'smsCommunityValidation', 'outcome-unknown': 'smsOutcomeUnknown', 'upstream-rejected': 'smsRejected', 'invalid-response': 'smsInvalidResponse', 'network-error': 'smsNetwork' })[code] ?? 'smsFailed'
+      const accept = (data) => {
+        if (data.state === 'confirmed' && data.ok === true) {
+          generation++; revision++; locked = false; state = null; publish(); confirmed(data); return
+        }
+        if (data.flow && state.flow && data.flow.flowId !== state.flow.flowId) {
+          state.challenge = null; state.error = 'smsExpired'; return
+        }
+        if (Object.hasOwn(data, 'flow')) state.flow = data.flow
+        if (data.ok === false && (data.flow === null || ['official-action-required', 'game-validation-failed', 'community-validation-failed'].includes(data.error?.code))) state.fatal = true
+        state.challenge = data.challenge ?? (state.challenge?.challengeId === data.flow?.challenge?.challengeId ? state.challenge : null)
+        state.error = data.ok === false ? errorKey(data.error?.code) : null
+      }
+      const perform = async (path, payload) => {
+        if (!state || locked || state.fatal) return
+        locked = true; state.busy = true; state.error = null
+        const gen = generation
+        revision++; publish()
+        try {
+          if (path === 'login/send' && !state.flow) {
+            const start = await request('login/start', { phone: state.phone })
+            if (generation !== gen) { cancelId(start.flow?.flowId); return }
+            state.phone = ''
+            accept(start)
+            if (!start.ok || !state.flow) return
+            payload = { flowId: state.flow.flowId }
+          }
+          const data = await request(path, payload)
+          if (generation !== gen) return
+          state.code = ''
+          accept(data)
+        } catch { if (generation === gen && state) { state.code = ''; state.error = 'smsFailed' } }
+        finally { if (generation === gen && state) { locked = false; state.busy = false; revision++; publish() } }
+      }
+      const cancel = () => {
+        const id = state?.flow?.flowId
+        generation++; revision++; locked = false; state = null; publish(); cancelId(id)
+      }
+      return {
+        open() { if (state) return; generation++; state = { phone: '', code: '', flow: null, challenge: null, busy: false, error: null }; publish() },
+        setPhone(value) { if (state && !locked && !state.flow) { state.phone = value; publish() } },
+        setCode(value) { if (state && !locked) { state.code = value; publish() } },
+        send() {
+          if (!state || locked) return
+          if (!state.flow && !/^1[3-9]\d{9}$/.test(state.phone)) { state.error = 'smsBadPhone'; publish(); return }
+          if (state.flow?.resendAt > now()) return
+          return perform('login/send', state.flow ? { flowId: state.flow.flowId } : undefined)
         },
-      }, h('div', { className: 'mys-dialog' },
-        h('h3', { className: 'mys-dialog-title' }, t('qrTitle')),
-        h('div', { className: 'mys-qr' }, h('img', { src: session.src, alt: t('qrTitle') })),
-        h('div', { className: 'mys-qr-state' }, label),
-        h('div', { className: 'mys-hint' }, t('qrHint')),
-        detector === 'ok' ? h('div', { className: 'mys-hint' }, t('detectorOk')) : null,
-        detector === 'fail' ? h('div', { className: 'mys-banner', 'data-tone': 'warn' }, t('detectorFail')) : null,
-        h('div', { className: 'mys-dialog-foot' },
-          state === 'expired' ? h(Button, { variant: 'primary', onClick: onRefresh }, t('qrRefresh')) : null,
-          h(Button, { onClick: onClose }, t('qrCancel')))))
+        submit() {
+          if (!state || locked) return
+          if (!state.flow || !/^\d{6}$/.test(state.code)) { state.error = 'smsBadCode'; publish(); return }
+          return perform('login/submit', { flowId: state.flow.flowId, code: state.code })
+        },
+        solve(challengeId, result) {
+          if (!state || locked || !state.challenge || state.challenge.challengeId !== challengeId || state.challenge.expiresAt <= now()) return
+          state.challenge = null
+          return perform('login/challenge', { flowId: state.flow.flowId, challengeId, result })
+        },
+        widgetError() { if (state) { revision++; state.challenge = null; state.code = ''; state.error = 'smsWidgetFailed'; state.fatal = true; publish() } },
+        async readState() {
+          if (!state?.flow || locked || state.fatal) return
+          const id = state.flow.flowId, gen = generation, rev = revision
+          try {
+            const data = await request('login/state')
+            if (gen !== generation || rev !== revision || !state) return
+            if (!data.flow || data.flow.flowId !== id) { state.challenge = null; state.error = 'smsExpired'; state.flow = { ...state.flow, status: 'expired' } }
+            else {
+              state.flow = data.flow
+              if (state.challenge?.challengeId !== data.flow.challenge?.challengeId) state.challenge = null
+              if (data.flow.status === 'expired') state.error = 'smsExpired'
+            }
+            publish()
+          } catch { if (gen === generation && rev === revision && state) { state.error = 'smsFailed'; publish() } }
+        },
+        cancel, dispose: cancel,
+      }
+    }
+
+    function createCaptchaBridge({ getWindow, nonce, challenge, onResult, onError, onReady = () => {}, now = Date.now }) {
+      let done = false
+      const send = (data) => getWindow()?.postMessage({ ...data, nonce }, '*')
+      return {
+        load() {
+          if (done || now() >= challenge.expiresAt) { onError(); return }
+          const config = {}
+          for (const key of ['captchaId', 'challenge', 'newCaptcha', 'offline', 'riskType', 'userInfo', 'language']) {
+            if (Object.hasOwn(challenge.config, key)) config[key] = challenge.config[key]
+          }
+          send({ type: 'mys-captcha:init', version: challenge.version, config })
+        },
+        receive(event) {
+          if (done || now() >= challenge.expiresAt || event.source !== getWindow()) return
+          const data = event.data
+          if (!data || data.nonce !== nonce) return
+          if (data.type === 'mys-captcha:ready') { onReady(); return }
+          if (data.type === 'mys-captcha:error') { done = true; onError(); return }
+          if (data.type !== 'mys-captcha:success') return
+          const fields = challenge.version === 'gt4' ? ['captcha_id', 'lot_number', 'pass_token', 'gen_time', 'captcha_output'] : ['geetest_challenge', 'geetest_validate', 'geetest_seccode']
+          const raw = data.result, result = {}
+          if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return
+          for (const field of fields) {
+            const value = raw[field]
+            if (typeof value !== 'string' || !/^[A-Za-z0-9_~+/.=|:-]{1,8192}$/.test(value)) return
+            result[field] = value
+          }
+          if (JSON.stringify(result).length > 12288) return
+          done = true; onResult(challenge.challengeId, result)
+        },
+        dispose() { done = true; send({ type: 'mys-captcha:destroy' }) },
+      }
+    }
+
+    function CaptchaFrame({ t, challenge, onResult, onError }) {
+      const frame = useRef(null), bridge = useRef(null)
+      const [html, setHtml] = useState(null)
+      const callbacks = useRef({ onResult, onError }); callbacks.current = { onResult, onError }
+      useEffect(() => {
+        let stopped = false, timeout
+        const current = createCaptchaBridge({ getWindow: () => frame.current?.contentWindow, nonce: crypto.randomUUID(), challenge,
+          onResult: (...args) => callbacks.current.onResult(...args), onReady: () => clearTimeout(timeout), onError: () => { clearTimeout(timeout); callbacks.current.onError() } })
+        bridge.current = current
+        window.addEventListener('message', current.receive)
+        // Fetch through the authenticated owner carrier. Desktop uses IPC fetch,
+        // so an iframe navigation to apiUrl() would not reach the Host there.
+        void (async () => {
+          try {
+            const response = await fetch(apiUrl('login/captcha-frame'), { credentials: 'include', cache: 'no-store' })
+            if (!response.ok || !response.headers.get('content-type')?.startsWith('text/html')) throw new Error()
+            const text = await response.text()
+            if (text.length > 32768) throw new Error()
+            if (!stopped) setHtml(text)
+          } catch { if (!stopped) callbacks.current.onError() }
+        })()
+        timeout = setTimeout(() => { if (!stopped) callbacks.current.onError() }, Math.min(30000, Math.max(0, challenge.expiresAt - Date.now())))
+        const expiry = setTimeout(() => { if (!stopped) callbacks.current.onError() }, Math.max(0, challenge.expiresAt - Date.now()))
+        return () => { stopped = true; clearTimeout(expiry); clearTimeout(timeout); current.dispose(); window.removeEventListener('message', current.receive); bridge.current = null }
+      }, [challenge.challengeId])
+      return html === null ? h('div', { role: 'status' }, t('smsWidgetLoading')) : h('iframe', {
+        ref: frame, title: t('smsVerification'), sandbox: 'allow-scripts', referrerPolicy: 'no-referrer', srcDoc: html,
+        className: 'mys-captcha-frame', onLoad: () => bridge.current?.load(), onError,
+      })
+    }
+
+    function useMysLogin({ t, refresh, onNotice }) {
+      const [session, setSession] = useState(null)
+      const refs = useRef({ refresh, onNotice, t }); refs.current = { refresh, onNotice, t }
+      const controller = useRef(null)
+      if (!controller.current) controller.current = createSmsController({
+        request: (path, body) => requestJson(path, body === undefined ? undefined : { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }),
+        changed: setSession,
+        confirmed: (data) => { refs.current.onNotice?.(refs.current.t(data.warning ? 'smsSuccessWarning' : 'smsSuccess')); void refs.current.refresh?.() },
+      })
+      useEffect(() => () => controller.current.dispose(), [])
+      useEffect(() => {
+        if (!session?.flow) return undefined
+        const timer = setInterval(() => { void controller.current.readState() }, 2000)
+        return () => clearInterval(timer)
+      }, [session?.flow?.flowId])
+      return { session, busy: session?.busy === true, controller: controller.current, startLogin: () => controller.current.open(), cancelLogin: () => controller.current.cancel() }
+    }
+
+    function SmsDialog({ t, session, controller }) {
+      const [now, setNow] = useState(Date.now)
+      const dialog = useRef(null)
+      const close = useRef(controller.cancel); close.current = controller.cancel
+      useEffect(() => {
+        const previous = document.activeElement
+        const root = dialog.current
+        root?.querySelector('input:not(:disabled),button:not(:disabled):not([hidden])')?.focus()
+        // Focus events leaving an iframe reach the parent document. A document
+        // guard also covers controls that become disabled during a request;
+        // aria-modal and a bubbling keydown trap alone cannot contain those.
+        const containFocus = event => { if (root && !root.contains(event.target)) root.focus() }
+        document.addEventListener('focusin', containFocus, true)
+        const timer = setInterval(() => setNow(Date.now()), 1000)
+        return () => { document.removeEventListener('focusin', containFocus, true); clearInterval(timer); previous?.focus?.() }
+      }, [])
+      const flow = session.flow
+      const seconds = Math.max(0, Math.ceil(((flow?.resendAt ?? 0) - now) / 1000))
+      const terminal = session.fatal || (flow && (['error', 'expired', 'candidate-ready'].includes(flow.status) || flow.expiresAt <= now))
+      const disabled = session.busy || flow?.busy || terminal || !!session.challenge
+      const codeReady = flow?.status === 'code-sent'
+      useEffect(() => {
+        const root = dialog.current
+        if (!root) return
+        const active = document.activeElement
+        if (!root.contains(active) || active?.disabled) root.focus()
+        if (!disabled && codeReady && document.activeElement === root) root.querySelector('input[autocomplete="one-time-code"]:not(:disabled)')?.focus()
+      }, [disabled, codeReady, session.error, !!flow])
+      const onSubmit = (event) => { event.preventDefault(); if (!disabled) void (codeReady ? controller.submit() : controller.send()) }
+      return h('div', { className: 'mys-overlay', role: 'presentation', onClick: event => { if (event.target === event.currentTarget) controller.cancel() } },
+        h('div', { className: 'mys-dialog', ref: dialog, role: 'dialog', tabIndex: -1, 'aria-modal': true, 'aria-label': t('smsTitle'), 'aria-busy': session.busy,
+          onKeyDown: event => {
+            if (event.key === 'Escape') { event.preventDefault(); close.current(); return }
+            if (event.key !== 'Tab') return
+            const items = [...(dialog.current?.querySelectorAll('input:not(:disabled),button:not(:disabled):not([hidden]),iframe') ?? [])]
+            const first = items[0], last = items.at(-1)
+            if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus() }
+            else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus() }
+          } },
+          h('h3', { className: 'mys-dialog-title' }, t('smsTitle')),
+          h('div', { className: 'mys-hint' }, t('smsHint')),
+          h('form', { onSubmit },
+            h('label', { className: 'mys-field' }, t('smsPhone'), h('input', { className: 'mys-input', type: 'tel', inputMode: 'tel', autoComplete: 'tel-national', maxLength: 11,
+              value: flow ? flow.phoneMasked : session.phone, disabled: !!flow || session.busy, onChange: event => controller.setPhone(event.target.value) })),
+            flow ? h('label', { className: 'mys-field' }, t('smsCode'), h('input', { className: 'mys-input', type: 'text', inputMode: 'numeric', autoComplete: 'one-time-code', maxLength: 6, value: session.code,
+              disabled: !codeReady || disabled, onChange: event => controller.setCode(event.target.value) })) : null,
+            session.error ? h('div', { className: 'mys-banner', role: 'alert', 'data-tone': 'warn' }, t(session.error)) : null,
+            h('div', { role: 'status', 'aria-live': 'polite', className: 'mys-hint' }, session.busy ? t('smsBusy') : session.error ? '' : terminal ? t('smsExpired') : codeReady ? t('smsCodeSent') : ''),
+            seconds > 0 ? h('div', { className: 'mys-hint', 'aria-live': 'off' }, fill(t('smsCountdown'), { seconds })) : null,
+            session.challenge ? h(CaptchaFrame, { key: session.challenge.challengeId, t, challenge: session.challenge, onResult: controller.solve, onError: controller.widgetError }) : null,
+            h('div', { className: 'mys-dialog-foot' },
+              h(Button, { type: 'button', variant: 'primary', disabled: !!disabled || (!codeReady && seconds > 0), onClick: () => { if (!disabled) void (codeReady ? controller.submit() : controller.send()) } }, t(codeReady ? 'smsSubmit' : 'smsSend')),
+              flow ? h(Button, { type: 'button', disabled: !!disabled || seconds > 0, onClick: () => { void controller.send() } }, t('smsResend')) : null,
+              h(Button, { type: 'button', onClick: controller.cancel }, t('smsCancel'))),
+            // Native form submission supports Enter without giving custom Button
+            // wrappers an implicit second submission path.
+            h('button', { type: 'submit', hidden: true, disabled: !!disabled, tabIndex: -1, 'aria-hidden': true }))))
     }
 
     const BADGE_DISMISS_KEY = 'dsh.mys-checkin.dismissed-at'
@@ -869,12 +1229,13 @@ window.__ModuleLoader__.load({
       if (lastError === null || lastError === undefined) return null
       const at = String(lastError.at ?? '')
       if (dismissed === at) return null
+      const captcha = gameCaptcha(lastError.code)
       const text = lastError.code === 'LOGIN_EXPIRED'
         ? t('badgeExpired')
-        : lastError.code === 'CAPTCHA'
+        : captcha
           ? t('badgeCaptcha')
           : t('badgeRun')
-      return h('div', { className: 'mys-badge', role: 'status', title: t('badgeOpen') },
+      return h('div', { className: 'mys-badge', 'data-tone': captcha ? 'warn' : 'error', role: 'status', title: t('badgeOpen') },
         h('span', { className: 'mys-badge-text' }, text),
         h('button', {
           type: 'button',
@@ -893,27 +1254,13 @@ window.__ModuleLoader__.load({
 
     function Section({ t, __status }) {
       const [notice, setNotice] = useState(null)
-      const [draft, setDraft] = useState(null)
-      const [busy, setBusy] = useState({ run: false, verify: false, refresh: false })
+      const [busy, setBusy] = useState({ verify: false, refresh: false })
       const [verifyInfo, setVerifyInfo] = useState(null)
       const [deleteArmed, setDeleteArmed] = useState(false)
-      const dirtyRef = useRef(false)
-      const saveTimerRef = useRef(null)
-      const draftRef = useRef(null)
-
-      // Keep the editable draft in step with the host unless the user is mid-edit.
-      const { status, error, refresh } = useMysStatus((data) => {
-        if (!dirtyRef.current && data.config) {
-          draftRef.current = data.config
-          setDraft(data.config)
-        }
-      }, __status)
+      const panel = useCheckinPanel(__status)
+      const { status, error, draft, runIssue, targets, runBlocked, canEdit, saveFeedback } = panel.view()
+      const { refresh, patchDraft, runNow } = panel
       const loginFlow = useMysLogin({ t, refresh, onNotice: setNotice })
-      const detector = useDetector(loginFlow.qr?.src)
-
-      useEffect(() => () => {
-        if (saveTimerRef.current !== null) clearTimeout(saveTimerRef.current)
-      }, [])
 
       useEffect(() => {
         if (notice === null) return undefined
@@ -927,34 +1274,6 @@ window.__ModuleLoader__.load({
         const timer = setTimeout(() => setDeleteArmed(false), 6000)
         return () => clearTimeout(timer)
       }, [deleteArmed])
-
-      const scheduleSave = useCallback((next) => {
-        dirtyRef.current = true
-        if (saveTimerRef.current !== null) clearTimeout(saveTimerRef.current)
-        saveTimerRef.current = setTimeout(async () => {
-          saveTimerRef.current = null
-          try {
-            await callJson('config', {
-              method: 'POST',
-              headers: { 'content-type': 'application/json' },
-              body: JSON.stringify({ config: next }),
-            })
-            dirtyRef.current = false
-            setNotice(t('saveOk'))
-            void refresh()
-          } catch (failure) {
-            setNotice(fill(t('saveFailed'), { message: String(failure?.message ?? failure) }))
-          }
-        }, 650)
-      }, [refresh, t])
-
-      const patchDraft = useCallback((mutate) => {
-        if (draftRef.current === null) return
-        const next = mutate(structuredClone(draftRef.current))
-        draftRef.current = next
-        setDraft(next)
-        scheduleSave(next)
-      }, [scheduleSave])
 
       const logout = useCallback(async () => {
         try {
@@ -975,18 +1294,6 @@ window.__ModuleLoader__.load({
         setDeleteArmed(false)
         void logout()
       }, [deleteArmed, logout])
-
-      const runNow = useCallback(async () => {
-        setBusy((current) => ({ ...current, run: true }))
-        try {
-          await callJson('run', { method: 'POST', body: '{}' })
-          void refresh()
-        } catch (failure) {
-          setNotice(fill(t('saveFailed'), { message: String(failure?.message ?? failure) }))
-        } finally {
-          setBusy((current) => ({ ...current, run: false }))
-        }
-      }, [refresh, t])
 
       const refreshCredentials = useCallback(async () => {
         setBusy((current) => ({ ...current, refresh: true }))
@@ -1015,6 +1322,7 @@ window.__ModuleLoader__.load({
 
       const config = draft
       const games = status?.games ?? []
+      const gameZone = status?.timezone ?? status?.config?.timezone ?? COMMUNITY_ZONE
       const lastResult = status?.lastResult ?? null
       const lastError = status?.lastError ?? null
 
@@ -1036,16 +1344,14 @@ window.__ModuleLoader__.load({
             h('div', { className: 'mys-banner-actions' },
               h(Button, { variant: 'primary', onClick: loginFlow.startLogin, disabled: loginFlow.busy }, t('relogin'))))
         }
-        if (code === 'CAPTCHA') {
+        if (gameCaptcha(code)) {
           return h('div', { className: 'mys-banner', 'data-tone': 'warn' },
             h('div', null, t('bannerCaptcha')),
             h('div', { className: 'mys-hint' }, String(lastError.message ?? '')))
         }
         return h('div', { className: 'mys-banner', 'data-tone': 'warn' },
           h('div', null, t('bannerRun')),
-          h('div', { className: 'mys-hint' }, String(lastError.message ?? '')),
-          h('div', { className: 'mys-banner-actions' },
-            h(Button, { onClick: runNow, disabled: busy.run || status?.running }, t('retryRun'))))
+          h('div', { className: 'mys-hint' }, String(lastError.message ?? '')))
       })()
 
       const login = status?.login ?? { state: 'anonymous' }
@@ -1054,6 +1360,7 @@ window.__ModuleLoader__.load({
       const reasonKey = plan.reason === 'missed' ? 'reasonMissed' : plan.reason === 'inside' ? 'reasonInside' : plan.reason === 'done-today' ? 'reasonDoneToday' : plan.reason === 'passed' ? 'reasonPassed' : 'reasonWindow'
 
       const enabled = config?.enabled === true
+      const verifyValid = verifyInfo?.reachable === true && verifyInfo?.sessionValid === true
       const windowsText = (config?.windows ?? []).map((window) => `${window.start}–${window.end}`).join('、')
       const taskState = enabled !== true
         ? { label: t('taskStatePaused'), tone: '' }
@@ -1071,14 +1378,21 @@ window.__ModuleLoader__.load({
           h('div', { className: 'mys-actions' },
             h(Button, {
               variant: 'primary',
-              disabled: busy.run || status?.running === true || login.state === 'anonymous',
-              onClick: runNow,
-            }, status?.running === true || busy.run ? t('running') : t('runNow')),
+              disabled: runBlocked !== null,
+              'aria-describedby': saveFeedback !== null ? 'mys-save-status' : runBlocked !== null ? 'mys-run-hint' : undefined,
+              onClick: () => runNow(targets),
+            }, runBlocked === 'runBusy' ? t('running') : t('runNow')),
             h(Button, {
               disabled: config === null,
               onClick: () => patchDraft((next) => { next.enabled = !enabled; return next }),
             }, enabled ? t('taskPause') : t('taskResume')))),
 
+        h('div', { id: 'mys-run-hint', role: 'status', className: 'mys-hint', hidden: runBlocked === null || runBlocked === saveFeedback }, runBlocked === null || runBlocked === saveFeedback ? '' : t(runBlocked)),
+        h('div', { id: 'mys-save-status', role: 'status', 'aria-label': t('saveFeedback'), className: 'mys-banner', 'data-tone': saveFeedback === 'saving' ? undefined : 'warn', hidden: saveFeedback === null },
+          saveFeedback === null ? '' : t(saveFeedback),
+          saveFeedback !== null && saveFeedback !== 'saving' && canEdit
+            ? h('div', { className: 'mys-banner-actions' }, h(Button, { size: 'sm', onClick: panel.acceptSaved }, t('useSaved'))) : null),
+        runIssue !== null ? h('div', { role: 'status', className: 'mys-banner', 'data-tone': 'warn' }, t(runIssue)) : null,
         error !== null ? h('div', { className: 'mys-banner', 'data-tone': 'error' }, fill(t('loadFailed'), { message: error })) : null,
         banner,
         notice !== null ? h('div', { className: 'mys-banner', 'data-tone': 'ok' }, notice) : null,
@@ -1094,7 +1408,7 @@ window.__ModuleLoader__.load({
             h('div', { className: 'mys-task-meta' },
               `${t('taskNextRun')}：${targetText === null ? t('noPlan') : `${targetText}（${t(reasonKey)}）`}`),
             h('div', { className: 'mys-task-meta' },
-              `${t('taskLastRun')}：${lastResult === null ? '—' : `${formatTime(lastResult.at)} · ${lastResult.summary ?? ''}`}`))),
+              `${t('taskLastRun')}：${lastResult === null ? '—' : `${recordTime(lastResult, gameZone, lastResult.date, t)} · ${lastResult.summary ?? ''}`}`))),
 
         h(Card, { title: t('account'), desc: t('accountDesc') },
           h('div', { className: 'mys-card-head' },
@@ -1122,7 +1436,7 @@ window.__ModuleLoader__.load({
                 ? h(Button, { onClick: refreshCredentials, disabled: busy.refresh }, busy.refresh ? t('refreshing') : t('refresh'))
                 : h(Button, { variant: 'primary', onClick: loginFlow.startLogin, disabled: loginFlow.busy },
                     loginFlow.busy
-                      ? t('qrChecking')
+                      ? t('smsBusy')
                       : login.state === 'active' ? t('upgradeLogin') : login.state === 'expired' ? t('relogin') : t('login')),
               login.state !== 'anonymous'
                 ? h(Button, { variant: 'danger', onClick: deleteLogin }, deleteArmed ? t('deleteConfirm') : t('deleteLogin'))
@@ -1137,14 +1451,15 @@ window.__ModuleLoader__.load({
             h(Button, { onClick: verify, disabled: busy.verify }, busy.verify ? t('verifying') : t('verify'))),
           verifyInfo === null ? null : h('div', {
             className: 'mys-banner',
-            'data-tone': verifyInfo.sessionValid === false || verifyInfo.reachable === false ? 'warn' : 'ok',
-          }, verifyInfo.sessionValid === null
-            ? t('verifyAnon')
-            : verifyInfo.reachable === false
-              ? fill(t('verifyFail'), { message: verifyInfo.message })
-              : verifyInfo.sessionValid === false
-                ? fill(t('verifyInvalid'), { message: verifyInfo.message })
-                : fill(t('verifyOk'), { ms: verifyInfo.elapsedMs ?? 0 }))),
+            role: 'status',
+            'data-tone': verifyValid ? 'ok' : verifyInfo.reachable === null ? undefined : 'warn',
+          }, verifyInfo.reachable === false
+            ? fill(t('verifyFail'), { message: verifyInfo.message })
+            : verifyInfo.reachable === null
+              ? t('verifyAnon')
+              : verifyValid ? fill(t('verifyOk'), { ms: verifyInfo.elapsedMs ?? 0 })
+                : verifyInfo.reachable === true && verifyInfo.sessionValid === false
+                  ? fill(t('verifyInvalid'), { message: verifyInfo.message ?? '—' }) : t('verifyUnavailable'))),
 
         h(Card, { title: t('auto'), desc: t('autoDesc') },
           h('div', { className: 'mys-row' },
@@ -1154,6 +1469,7 @@ window.__ModuleLoader__.load({
             h(Switch, {
               checked: config?.enabled === true,
               label: t('enabled'),
+              disabled: !canEdit,
               onChange: (value) => patchDraft((next) => { next.enabled = value; return next }),
             })),
 
@@ -1167,6 +1483,7 @@ window.__ModuleLoader__.load({
               h('input', {
                 className: 'mys-time',
                 type: 'time',
+                 disabled: !canEdit,
                 value: window.start,
                 'aria-label': t('windows'),
                 onChange: (event) => patchDraft((next) => {
@@ -1186,6 +1503,7 @@ window.__ModuleLoader__.load({
               h('input', {
                 className: 'mys-time',
                 type: 'time',
+                 disabled: !canEdit,
                 value: window.end,
                 'aria-label': t('windows'),
                 onChange: (event) => patchDraft((next) => {
@@ -1201,7 +1519,7 @@ window.__ModuleLoader__.load({
               h(Button, {
                 variant: 'danger',
                 size: 'sm',
-                disabled: (config?.windows ?? []).length <= 1,
+                disabled: !canEdit || (config?.windows ?? []).length <= 1,
                 onClick: () => patchDraft((next) => {
                   if (next.windows.length > 1) next.windows.splice(index, 1)
                   return next
@@ -1211,7 +1529,7 @@ window.__ModuleLoader__.load({
           h('div', { className: 'mys-actions' },
             h(Button, {
               size: 'sm',
-              disabled: (config?.windows ?? []).length >= 4,
+              disabled: !canEdit || (config?.windows ?? []).length >= 4,
               onClick: () => patchDraft((next) => {
                 if (next.windows.length >= 4) return next
                 const last = next.windows[next.windows.length - 1] ?? { start: '18:00', end: '18:30' }
@@ -1234,35 +1552,50 @@ window.__ModuleLoader__.load({
             h(Switch, {
               checked: config?.runWhenMissed === true,
               label: t('runWhenMissed'),
+              disabled: !canEdit,
               onChange: (value) => patchDraft((next) => { next.runWhenMissed = value; return next }),
             })),
 
           h('div', { className: 'mys-meta' },
             `${t('nextRun')}：${targetText === null ? t('noPlan') : `${targetText}（${t(reasonKey)}）`}`)),
 
-        h(Card, { title: t('games'), desc: t('gamesDesc') },
+        h(Card, { title: t('projects'), desc: t('projectsDesc'), id: 'mys-targets' },
           h('div', { className: 'mys-list' },
-            games.map((game) => h('div', { className: 'mys-row', key: game.id },
+            games.map((game) => h('label', { className: 'mys-row', key: game.id },
+              h('span', { className: 'mys-row-label' },
+                h('span', { className: 'mys-row-title' }, game.label),
+                h('span', { className: 'mys-row-desc' },
+                  game.role == null ? t('notQueried')
+                    : typeof game.role === 'object' ? `${game.role.nickname ?? ''} ${game.role.uid ?? ''} ${game.role.regionName ?? ''}`.trim()
+                      : t('noRole'))),
               h('input', {
                 type: 'checkbox',
-                checked: game.enabled === true,
+                checked: config?.games?.[game.id] === true,
+                disabled: config === null,
                 'aria-label': game.label,
-                onChange: (event) => patchDraft((next) => {
-                  next.games[game.id] = event.target.checked
-                  return next
-                }),
-              }),
-              h('div', { className: 'mys-row-label' },
-                h('div', { className: 'mys-row-title' }, game.label),
-                h('div', { className: 'mys-row-desc' },
-                  game.role === null || game.role === undefined
-                    ? t('notQueried')
-                    : typeof game.role === 'object' && game.role !== null
-                      ? `${game.role.nickname ?? ''} ${game.role.uid ?? ''} ${game.role.regionName ?? ''}`.trim()
-                      : t('noRole'))))))),
+                onChange: (event) => patchDraft((next) => { next.games[game.id] = event.target.checked; return next }),
+              }))),
+            h('label', { className: 'mys-row' },
+              h('span', { className: 'mys-row-label' },
+                h('span', { className: 'mys-row-title' }, t('dabieye')),
+                h('span', { className: 'mys-row-desc' }, t('dabieyeDesc'))),
+              h('input', {
+                type: 'checkbox',
+                checked: config?.community?.enabled === true,
+                disabled: config === null,
+                'aria-label': t('dabieye'),
+                onChange: (event) => patchDraft((next) => { next.community.enabled = event.target.checked; return next }),
+              }))),
+          login.state !== 'anonymous' && status?.community?.capability?.available === false
+            ? h('div', { className: 'mys-row' },
+                h('div', { className: 'mys-row-desc mys-row-label' }, t(status.community.capability.reason === 'missing-mid' ? 'communityMissingMid' : 'communityNoToken')),
+                h(Button, { size: 'sm', onClick: loginFlow.startLogin, disabled: loginFlow.busy }, t('relogin')))
+            : null),
 
         h('section', { className: 'mys-page-section' },
           h('h2', null, t('taskRunHistory')),
+          h('div', { className: 'mys-hint' }, t('recordNote')),
+          h('h2', null, t('runTitle')),
           lastResult === null
             ? h('div', { className: 'mys-empty' }, t('noResult'))
             : (() => {
@@ -1271,15 +1604,11 @@ window.__ModuleLoader__.load({
                 const done = roled.filter((item) => item.outcome === 'signed' || item.outcome === 'already').length
                 const total = roled.length
                 const allDone = total > 0 && done === total
-                const at = new Date(lastResult.at)
-                const timeText = Number.isNaN(at.getTime())
-                  ? '—'
-                  : `${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`
+                const timeText = recordTime(lastResult, gameZone, lastResult.date, t)
                 return h('div', { className: 'mys-run' },
                   h('div', { className: 'mys-summary' },
-                    h('div', { className: 'mys-summary-mark', 'aria-hidden': true }, '✓'),
+                    h('div', { className: 'mys-summary-mark', 'aria-hidden': true, 'data-done': allDone }, allDone ? '✓' : '–'),
                     h('div', { className: 'mys-summary-main' },
-                      h('div', { className: 'mys-summary-title' }, t('runTitle')),
                       h('div', { className: 'mys-summary-sub' }, `${t('runSigned')} `, h('b', null, String(done)), ` ${t('runAccounts')}`),
                       h('div', { className: 'mys-summary-sub' },
                         `${t('runAuto')}：${lastResult.reason === 'schedule' ? t('yes') : t('no')} | ${t('runAt')}：${timeText}`)),
@@ -1312,7 +1641,9 @@ window.__ModuleLoader__.load({
                       h('td', null, awardsText(item.awards)),
                       h('td', null, typeof item.totalDays === 'number' ? `${item.totalDays}/25` : '—')))))),
                   h('div', { className: 'mys-run-foot' }, allDone ? t('runFooterDone') : t('runFooterPartial')))
-              })()),
+               })(),
+          h(CommunityResults, { t, community: status?.community })),
+        h('div', { className: 'mys-page-section' }, h(CoinSnapshot, { t, balance: status?.community?.balance, balanceError: status?.community?.balanceError })),
 
         h('details', { className: 'mys-details' },
           h('summary', null, t('advanced')),
@@ -1320,24 +1651,28 @@ window.__ModuleLoader__.load({
             h('label', { className: 'mys-field' }, t('timezone'),
               h('input', {
                 className: 'mys-input',
+                disabled: !canEdit,
                 value: draft?.timezone ?? '',
                 onChange: (event) => patchDraft((next) => { next.timezone = event.target.value; return next }),
               })),
             h('label', { className: 'mys-field' }, t('appVersion'),
               h('input', {
                 className: 'mys-input',
+                disabled: !canEdit,
                 value: draft?.client?.appVersion ?? '',
                 onChange: (event) => patchDraft((next) => { next.client.appVersion = event.target.value; return next }),
               })),
             h('label', { className: 'mys-field' }, t('salt'),
               h('input', {
                 className: 'mys-input',
+                disabled: !canEdit,
                 value: draft?.client?.salt ?? '',
                 onChange: (event) => patchDraft((next) => { next.client.salt = event.target.value; return next }),
               })),
             h('label', { className: 'mys-field' }, `${t('gap')} · ${t('gapMin')}`,
               h('input', {
                 className: 'mys-input',
+                disabled: !canEdit,
                 type: 'number',
                 min: 1,
                 max: 60,
@@ -1347,6 +1682,7 @@ window.__ModuleLoader__.load({
             h('label', { className: 'mys-field' }, `${t('gap')} · ${t('gapMax')}`,
               h('input', {
                 className: 'mys-input',
+                disabled: !canEdit,
                 type: 'number',
                 min: 1,
                 max: 120,
@@ -1356,6 +1692,7 @@ window.__ModuleLoader__.load({
             h('label', { className: 'mys-field' }, `${t('retry')} · ${t('retryAttempts')}`,
               h('input', {
                 className: 'mys-input',
+                disabled: !canEdit,
                 type: 'number',
                 min: 0,
                 max: 3,
@@ -1365,20 +1702,12 @@ window.__ModuleLoader__.load({
             h('label', { className: 'mys-field' }, `${t('retry')} · ${t('retryDelay')}`,
               h('input', {
                 className: 'mys-input',
+                disabled: !canEdit,
                 type: 'number',
                 min: 10,
                 max: 900,
                 value: Math.round((draft?.retry?.delayMs ?? 60000) / 1000),
                 onChange: (event) => patchDraft((next) => { next.retry.delayMs = Math.max(10, Number(event.target.value) || 60) * 1000; return next }),
-              })),
-            h('label', { className: 'mys-field' }, t('qrAge'),
-              h('input', {
-                className: 'mys-input',
-                type: 'number',
-                min: 60,
-                max: 300,
-                value: Math.round((draft?.maxQrAgeMs ?? 180000) / 1000),
-                onChange: (event) => patchDraft((next) => { next.maxQrAgeMs = Math.max(60, Number(event.target.value) || 180) * 1000; return next }),
               })),
             h('div', { className: 'mys-hint' }, t('appVersionDesc')))),
 
@@ -1396,13 +1725,7 @@ window.__ModuleLoader__.load({
         h(Card, { title: t('riskTitle') },
           h('div', { className: 'mys-hint' }, t('riskList'))),
 
-        loginFlow.qr === null ? null : h(QrDialog, {
-          t,
-          session: loginFlow.qr,
-          detector,
-          onRefresh: loginFlow.startLogin,
-          onClose: loginFlow.cancelLogin,
-        }))
+        loginFlow.session === null ? null : h(SmsDialog, { t, session: loginFlow.session, controller: loginFlow.controller }))
     }
 
     /** Sidebar rail icon for the task panel. */
