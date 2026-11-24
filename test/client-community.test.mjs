@@ -97,7 +97,86 @@ function communityCheckbox(tree, h) {
 const writes = (h) => h.requests.filter((item) => item.method === 'POST')
 function deferred() { return Promise.withResolvers() }
 
-test('projects share one card and disable the sole manual action at the moment of edit', async () => {
+test('primary controls and one shared results table precede the closed settings and account disclosures', () => {
+  const h = harness(), status = fixture()
+  status.lastResult = { at: 123, date: '1970-01-01', reason: 'manual', results: [
+    { game: 'genshin', label: '原神', outcome: 'signed', uid: '123456', totalDays: 2 },
+    { game: 'starrail', label: '星穹铁道', outcome: 'error' },
+  ] }
+  status.lastError = { code: 'CAPTCHA', message: 'synthetic verification required' }
+  const all = nodes(h.tree(status))
+  const disclosures = all.filter((node) => node.type === 'details')
+  const settings = disclosures.find((node) => nodes(node).includes(communityCheckbox(node, h)))
+  const account = disclosures.find((node) => nodes(node).some((item) => item.type?.name === 'Button' && text(item) === h.t('verify')))
+  assert.ok(settings && account && settings !== account, 'settings and diagnostics have separate disclosures')
+  assert.ok(!settings.props.open && !account.props.open)
+  const tables = all.filter((node) => node.type === 'table')
+  assert.equal(tables.length, 1, 'game results share one table')
+  assert.match(text(tables[0]), /原神.*成功.*星穹铁道.*失败/)
+  assert.ok(all.indexOf(tables[0]) < all.indexOf(settings))
+  assert.ok(all.indexOf(tables[0]) < all.indexOf(account))
+  const switches = all.filter((node) => node.type?.name === 'Switch' && node.props.label === h.t('enabled'))
+  assert.equal(switches.length, 1)
+  assert.ok(all.indexOf(switches[0]) < all.indexOf(tables[0]))
+  assert.ok(!all.some((node) => node.type?.name === 'Button' && [h.t('taskPause'), h.t('taskResume')].includes(text(node))))
+  const warning = all.find((node) => node.props?.['data-tone'] === 'warn' && text(node).includes(h.t('bannerCaptcha')))
+  assert.ok(warning && all.indexOf(warning) < all.indexOf(tables[0]))
+})
+
+test('Dabieye is a row in the shared table even if no game has a result', () => {
+  const h = harness(), status = fixture()
+  status.community.lastResult = { at: Date.parse('2020-11-18T20:00:00Z'), day: '2020-11-19', ok: true, results: [{ gid: '5', label: '大别野', outcome: 'success' }] }
+  for (const lastResult of [null, { at: 123, date: '1970-01-01', results: [{ game: 'genshin', label: '原神', outcome: 'signed' }] }]) {
+    const view = h.tree({ ...status, lastResult })
+    const tables = nodes(view).filter((node) => node.type === 'table')
+    assert.equal(tables.length, 1)
+    const body = nodes(tables[0]).find((node) => node.type === 'tbody')
+    const item = nodes(body).find((node) => node.type?.name === 'CommunityResults')
+    assert.ok(item, 'the community component is a child of the same table body')
+    const row = item.type(item.props)
+    assert.equal(row.type, 'tr')
+    assert.match(text(row), /大别野.*2020-11-19 04:00:00.*历史记录.*接口已接受.*积分到账未独立验证/)
+    assert.doesNotMatch(text(row), /米游币余额/)
+    assert.match(text(body), lastResult === null ? /尚无游戏签到记录/ : /原神.*成功/)
+  }
+})
+
+test('balance verification after an accepted Dabieye sign does not replace the sign outcome', () => {
+  const h = harness(), status = fixture()
+  status.community.lastResult = { ok: false, results: [{ gid: '5', outcome: 'success' }] }
+  status.community.lastError = { code: 'captcha', message: 'synthetic verification' }
+  const item = nodes(h.tree(status)).find((node) => node.type?.name === 'CommunityResults')
+  assert.match(text(item.type(item.props)), /接口已接受.*余额.*人工验证.*积分到账未独立验证/)
+})
+
+test('an automatic plan is not shown as the next run while signed out or without targets', () => {
+  const h = harness()
+  const status = fixture({ ...config(), enabled: true })
+  status.login = { state: 'anonymous' }
+  status.schedule = { targetAt: Date.now() + 3600000, reason: 'window' }
+  assert.match(text(h.tree(status)), /待登录/)
+  assert.doesNotMatch(text(h.tree(status)), /下次执行/)
+  const empty = fixture({ ...config([], false), enabled: true })
+  assert.match(text(h.tree(empty)), /未选项目/)
+})
+
+test('the no-target hint opens and focuses the settings without writing', () => {
+  const h = harness()
+  const all = nodes(h.tree(fixture(config([], false))))
+  const button = all.find((node) => node.type?.name === 'Button' && text(node) === '查看签到项目')
+  assert.ok(button)
+  const details = all.find((node) => node.type === 'details' && node.props.id === button.props['aria-controls'])
+  assert.ok(details)
+  let focused = false
+  const element = { open: false, firstElementChild: { focus: () => { focused = true } } }
+  details.props.ref.current = element
+  button.props.onClick()
+  assert.equal(element.open, true)
+  assert.equal(focused, true)
+  assert.deepEqual(writes(h), [])
+})
+
+test('projects share one group and disable the sole manual action at the moment of edit', async () => {
   const h = harness({ keepPanel: true }), status = fixture()
   status.lastError = { code: 'RUN_FAILED', message: 'synthetic failure' }
   const tree = h.tree(status)
@@ -181,7 +260,23 @@ test('old account can repair community credentials by SMS, and unified run still
   assert.deepEqual(writes(h), [{ path: runPath, method: 'POST', body: { gameIds: ['genshin'], dabieye: true, accountRevision: rev1 } }])
 })
 
-test('results show community acceptance separately from historical coin balance and query failure', () => {
+test('the Dabieye reward note shows the current account balance without replacing its acceptance caveat', () => {
+  const h = harness(), status = fixture(), now = Date.now()
+  const day = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Shanghai', year: 'numeric', month: '2-digit', day: '2-digit' }).format(now)
+  status.community.lastResult = { at: now, day, ok: true, results: [{ gid: '5', outcome: 'success' }] }
+  const notes = () => {
+    const item = nodes(h.tree(status)).find((node) => node.type?.name === 'CommunityResults')
+    return text(nodes(item.type(item.props)).filter((node) => node.type === 'td')[1])
+  }
+  assert.doesNotMatch(notes(), /米游币余额/)
+  status.community.balance = { totalPoints: 1698, at: now, day }
+  assert.match(notes(), /米游币余额：1698.*积分到账未独立验证/)
+  assert.doesNotMatch(notes(), /历史|本次赚取/)
+  status.community.balance.totalPoints = 0
+  assert.match(notes(), /米游币余额：0/)
+})
+
+test('the historical coin balance stays labeled separately from acceptance, with query detail in the log', () => {
   const h = harness(), status = fixture()
   status.community.lastResult = { at: 123, ok: true, results: [{ gid: '5', label: '大别野', outcome: 'success', message: '合成结果' }] }
   status.community.balanceError = { message: '合成查询错误' }
@@ -193,7 +288,8 @@ test('results show community acceptance separately from historical coin balance 
   assert.match(content, /接口已接受.*积分到账未独立验证/)
   const coins = nodes(view).find((node) => node.type?.name === 'CoinSnapshot')
   const snapshot = text(coins.type(coins.props))
-  assert.doesNotMatch(content, /1234|积分快照/)
+  assert.match(content, /米游币余额：1234.*历史积分快照/)
+  assert.doesNotMatch(content, /本次赚取|合成查询错误/)
   assert.match(snapshot, /积分查询失败/)
   assert.match(snapshot, /历史.*快照/)
   assert.match(snapshot, /1234/)
@@ -388,15 +484,27 @@ test('independent records show business date and time, and account coins have th
   status.lastResult = { at, date: '2020-11-18', ok: true, results: [] }
   status.community.lastResult = { at, day: '2020-11-19', ok: true, results: [] }
   const view = h.tree(status)
-  const game = nodes(view).find((node) => node.type === 'h2' && text(node) === '上次游戏签到')
-  assert.ok(game)
-  assert.match(text(view), /2020.11.18.*20:00:00.*UTC.*历史记录/)
+  assert.ok(nodes(view).find((node) => node.type === 'h2' && text(node) === '最近签到'))
+  assert.match(text(view), /游戏：.*2020.11.18.*20:00:00.*UTC.*历史记录/)
   const item = nodes(view).find((node) => node.type?.name === 'CommunityResults')
   const community = item.type(item.props)
-  assert.match(text(community), /上次大别野签到.*2020.11.19.*04:00:00.*Asia\/Shanghai.*历史记录/)
+  assert.match(text(community), /大别野.*2020.11.19.*04:00:00.*Asia\/Shanghai.*历史记录/)
   assert.match(text(view), /分别记录.*不一定.*同一轮/)
   const snapshot = nodes(view).find((node) => node.type?.name === 'CoinSnapshot')
-  assert.ok(nodes(snapshot.type(snapshot.props)).find((node) => node.type === 'h2' && text(node) === '账号米游币快照'))
+  assert.ok(nodes(snapshot.type(snapshot.props)).find((node) => node.type === 'h4' && text(node) === '账号米游币快照'))
+})
+
+test('the coin snapshot appears once inside the collapsed account diagnostics log section', () => {
+  const h = harness(), status = fixture()
+  status.community.balance = { totalPoints: 1698, todayReceived: 30, todayRemaining: 0, at: 123, day: '1970-01-01' }
+  const all = nodes(h.tree(status))
+  const snapshots = all.filter((node) => node.type?.name === 'CoinSnapshot')
+  assert.equal(snapshots.length, 1)
+  const logs = all.find((node) => node.props?.title === h.t('logs'))
+  assert.ok(nodes(logs).includes(snapshots[0]))
+  const diagnostics = all.find((node) => node.type === 'details' && nodes(node).includes(logs))
+  assert.ok(diagnostics && !diagnostics.props.open)
+  assert.match(text(snapshots[0].type(snapshots[0].props)), /1698.*30.*剩余.*0.*查询时间/)
 })
 
 test('both game CAPTCHA codes and skipped-only community verification offer manual App guidance', () => {
@@ -411,7 +519,7 @@ test('both game CAPTCHA codes and skipped-only community verification offer manu
     const item = nodes(view).find((node) => node.type?.name === 'CommunityResults')
     const community = item.type(item.props)
     assert.match(text(community), /米游社 App.*手动处理/)
-    assert.equal(nodes(community).find((node) => text(node) === '未执行')?.props['data-tone'], '')
+    assert.equal(nodes(community).find((node) => node.type === 'span' && text(node) === '未执行')?.props['data-outcome'], 'skipped')
     status.community.lastError = null
     status.community.lastResult.results[0].outcome = 'captcha'
     assert.match(text(item.type(item.props)), /米游社 App.*手动处理/)

@@ -19,7 +19,7 @@ window.__ModuleLoader__.load({
 .mys-head{display:flex;flex-direction:column;gap:4px}
 .mys-title{margin:0;font-size:18px;font-weight:600;line-height:26px}
 .mys-intro{margin:0;font-size:13px;line-height:20px;color:var(--dsw-alias-label-tertiary)}
-.mys-card{box-sizing:border-box;border:.5px solid var(--dsw-alias-border-l2);border-radius:10px;background:var(--dsw-alias-bg-layer-1,transparent);padding:14px 16px;display:flex;flex-direction:column;gap:12px}
+.mys-settings-group{display:flex;flex-direction:column;gap:8px}
 .mys-card-head{display:flex;align-items:flex-start;gap:12px}
 .mys-card-head-text{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
 .mys-card-title{margin:0;font-size:14px;font-weight:600;line-height:22px}
@@ -36,10 +36,7 @@ window.__ModuleLoader__.load({
 .mys-btn-ghost{border:.5px solid transparent;background:transparent;color:var(--dsw-alias-label-primary)}
 .mys-btn-ghost:hover{background:var(--dsw-alias-interactive-bg-hover,rgba(127,127,127,.08))}
 .mys-danger-text{color:var(--dsw-alias-state-error-primary,#d93026)}
-.mys-account{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px;line-height:20px;flex:1;min-width:0}
-.mys-dot{width:8px;height:8px;border-radius:50%;flex:none;background:var(--dsw-alias-label-tertiary,#8a919e)}
-.mys-dot[data-state=active]{background:var(--dsw-alias-state-success-primary)}
-.mys-dot[data-state=expired]{background:var(--dsw-alias-state-error-primary)}
+.mys-account{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;line-height:20px;min-width:0;max-width:100%}
 .mys-meta{color:var(--dsw-alias-label-tertiary);font-size:12px}
 .mys-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .mys-row-label{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
@@ -61,7 +58,7 @@ window.__ModuleLoader__.load({
 .mys-banner[data-tone=warn]{background:var(--dsw-alias-state-warn-tertiary);border-color:var(--dsw-alias-state-warn-secondary);color:var(--dsw-alias-state-warn-label)}
 .mys-banner[data-tone=ok]{background:var(--dsw-alias-state-success-tertiary);border-color:var(--dsw-alias-state-success-secondary);color:var(--dsw-alias-state-success-primary)}
 .mys-banner-actions{display:flex;gap:8px;flex-wrap:wrap}
-.mys-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+.mys-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(220px,100%),1fr));gap:10px}
 .mys-field{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--dsw-alias-label-tertiary)}
 .mys-input{box-sizing:border-box;font:inherit;font-size:12px;height:28px;padding:0 8px;border-radius:6px;border:.5px solid var(--dsw-alias-border-l2);background:var(--dsw-alias-bg-layer-1,transparent);color:var(--dsw-alias-label-primary);width:100%}
 .mys-input:focus-visible{outline:2px solid var(--dsw-focus-ring-color,var(--dsw-alias-brand-primary,#4d6bfe));outline-offset:1px}
@@ -89,46 +86,38 @@ window.__ModuleLoader__.load({
 .mys-details[open] summary{margin-bottom:8px}
 .mys-hint{font-size:12px;line-height:18px;color:var(--dsw-alias-label-tertiary)}
 .mys-list{display:flex;flex-direction:column;gap:8px}
-.mys-page{box-sizing:border-box;height:100%;overflow:auto;color:var(--dsw-alias-label-primary);padding:28px clamp(24px,4vw,48px) 48px;display:flex;flex-direction:column;gap:18px}
-.mys-page>*{width:100%;max-width:880px}
-.mys-page-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-start;gap:16px}
-.mys-page-title{margin:0;font-size:20px;font-weight:500;line-height:28px}
-.mys-page-intro{margin:4px 0 0;font-size:13px;line-height:20px;color:var(--dsw-alias-label-secondary)}
-.mys-task-list{display:flex;flex-direction:column;gap:10px}
-.mys-task-card{box-sizing:border-box;display:flex;align-items:flex-start;gap:16px;border:.5px solid var(--dsw-alias-border-l2);border-radius:var(--dsw-radius-xl,12px);background:var(--dsw-alias-bg-layer-1,transparent);padding:14px 16px}
-.mys-task-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:5px}
-.mys-task-title{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:500;line-height:22px;flex-wrap:wrap}
-.mys-task-meta{font-size:12px;line-height:18px;color:var(--dsw-alias-label-tertiary)}
-.mys-task-actions{display:flex;flex:none;flex-wrap:wrap;gap:8px;align-items:center}
-.mys-page-section{display:flex;flex-direction:column;gap:10px}
-.mys-page-section h2{margin:0;font-size:14px;font-weight:500;line-height:22px}
-.mys-avatar{width:36px;height:36px;border-radius:50%;object-fit:cover;flex:none;background:var(--dsw-alias-bg-layer-3);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:600;color:var(--dsw-alias-label-secondary)}
-.mys-account-text{display:flex;flex-direction:column;gap:2px;min-width:0}
-.mys-account-line{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.mys-account-name{font-size:14px;font-weight:500;line-height:20px}
-.mys-run{display:flex;flex-direction:column;gap:12px}
-.mys-summary{position:relative;display:flex;align-items:center;gap:14px;box-sizing:border-box;border:.5px solid var(--dsw-alias-border-l2);border-radius:var(--dsw-radius-xl,14px);padding:16px;background:linear-gradient(135deg,color-mix(in srgb,var(--dsw-alias-button-primary-fill,#4d6bfe) 12%,transparent),transparent 62%),var(--dsw-alias-bg-layer-1,transparent)}
-.mys-summary-mark{width:44px;height:44px;flex:none;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;color:var(--dsw-alias-state-success-primary);background:var(--dsw-alias-state-success-tertiary)}
-.mys-summary-mark[data-done=false]{color:var(--dsw-alias-state-warn-label);background:var(--dsw-alias-state-warn-tertiary)}
-.mys-summary-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
-.mys-summary-sub{font-size:12px;line-height:18px;color:var(--dsw-alias-label-secondary)}
-.mys-summary-score{flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:4px;text-align:right}
-.mys-summary-count{font-size:30px;font-weight:700;line-height:1;color:var(--dsw-alias-button-primary-fill,#4d6bfe);font-variant-numeric:tabular-nums}
-.mys-summary-badge{font-size:11px;line-height:18px;padding:0 10px;border-radius:999px;background:var(--dsw-alias-state-success-tertiary);color:var(--dsw-alias-state-success-primary)}
-.mys-summary-badge[data-done=false]{background:var(--dsw-alias-state-warn-tertiary);color:var(--dsw-alias-state-warn-label)}
-.mys-game{border:.5px solid var(--dsw-alias-border-l2);border-radius:var(--dsw-radius-lg,12px);overflow:hidden;background:var(--dsw-alias-bg-layer-1,transparent)}
-.mys-game-head{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:.5px solid var(--dsw-alias-border-l2);background:color-mix(in srgb,var(--mys-accent,#6b7280) 8%,transparent)}
-.mys-game-bar{width:4px;height:18px;border-radius:2px;flex:none;background:var(--mys-accent,#6b7280)}
-.mys-game-name{font-size:15px;font-weight:600;line-height:22px}
-.mys-game-count{font-size:11px;line-height:18px;padding:0 8px;border-radius:999px;border:.5px solid color-mix(in srgb,var(--mys-accent,#6b7280) 45%,transparent);color:var(--mys-accent,#6b7280)}
-.mys-game-table{width:100%;border-collapse:collapse;font-size:12px}
-.mys-game-table th{font-weight:400;color:var(--dsw-alias-label-tertiary);padding:6px 10px;border-bottom:.5px solid var(--dsw-alias-border-l2);text-align:center}
-.mys-game-table td{padding:8px 10px;text-align:center;font-variant-numeric:tabular-nums}
-.mys-status{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--dsw-alias-state-success-primary,#22a06b)}
-.mys-status[data-outcome=captcha],.mys-status[data-outcome=first-bind],.mys-status[data-outcome=not-bound]{color:var(--dsw-alias-state-warn-label)}
-.mys-status[data-outcome=expired],.mys-status[data-outcome=error]{color:var(--dsw-alias-state-error-primary,#a3231c)}
-.mys-status[data-outcome=no-role],.mys-status[data-outcome=skipped]{color:var(--dsw-alias-label-tertiary)}
-.mys-run-foot{text-align:center;font-size:12px;line-height:18px;color:var(--dsw-alias-label-tertiary);padding:2px 0 4px}
+.mys-page{box-sizing:border-box;height:100%;overflow:auto;color:var(--dsw-alias-label-primary);padding:24px clamp(16px,4vw,40px) 32px;display:flex;flex-direction:column;gap:10px}
+.mys-page>*{width:100%;max-width:880px;margin-inline:auto;flex:none}
+.mys-page-head,.mys-overview{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 16px}
+.mys-page-title{margin:0;font-size:20px;font-weight:600;line-height:28px}
+.mys-overview{padding:6px 0 10px;border-bottom:1px solid var(--dsw-alias-border-l2)}
+.mys-avatar{width:28px;height:28px;border-radius:50%;object-fit:cover;flex:none;background:var(--dsw-alias-bg-layer-3);display:grid;place-items:center;font-size:12px;font-weight:600;color:var(--dsw-alias-label-secondary)}
+.mys-account-name{font-size:13px;font-weight:600;overflow-wrap:anywhere}
+.mys-schedule-inline{display:flex;align-items:center;flex-wrap:wrap;gap:6px 8px;font-size:12px;color:var(--dsw-alias-label-secondary)}
+.mys-schedule-inline label{white-space:nowrap}
+.mys-page-section{display:flex;flex-direction:column;gap:6px;padding-block:2px 6px}
+.mys-page-section h2,.mys-page-section h3{margin:0;font-size:14px;font-weight:600;line-height:22px}
+.mys-record-head{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 10px}
+.mys-record-meta{font-size:12px;line-height:18px;color:var(--dsw-alias-label-secondary);overflow-wrap:anywhere}
+.mys-log-snapshot{display:flex;flex-direction:column;gap:4px;padding-bottom:6px;border-bottom:1px solid var(--dsw-alias-border-l2)}
+.mys-log-snapshot h4{margin:0;font-size:12px;font-weight:600;line-height:18px}
+.mys-game-table{width:100%;table-layout:fixed;border-collapse:collapse;font-size:12px;line-height:18px;text-align:left;overflow-wrap:anywhere}
+.mys-game-table th,.mys-game-table td{padding:6px 8px 6px 0;border-bottom:1px solid var(--dsw-alias-border-l2);vertical-align:top}
+.mys-game-table thead th{font-weight:400;color:var(--dsw-alias-label-secondary)}
+.mys-game-table thead th:first-child{width:40%}
+.mys-game-table thead th:nth-child(2){width:25%}
+.mys-game-table tbody th{font-weight:500}
+.mys-game-table tbody tr:last-child>*{border-bottom:0}
+.mys-game-meta{display:block;font-weight:400;font-size:11px;line-height:16px;color:var(--dsw-alias-label-secondary);font-variant-numeric:tabular-nums}
+.mys-status{color:var(--dsw-alias-label-secondary)}
+.mys-status[data-outcome=signed],.mys-status[data-outcome=already],.mys-status[data-outcome=success],.mys-status[data-outcome=cached-success]{color:var(--dsw-alias-state-success-primary)}
+.mys-status[data-outcome=captcha],.mys-status[data-outcome=unknown],.mys-status[data-outcome=auth-unavailable],.mys-status[data-outcome=first-bind],.mys-status[data-outcome=not-bound]{color:var(--dsw-alias-state-warn-label)}
+.mys-status[data-outcome=expired],.mys-status[data-outcome=error]{color:var(--dsw-alias-state-error-primary)}
+.mys-disclosure{border-top:1px solid var(--dsw-alias-border-l2)}
+.mys-disclosure>summary{padding:9px 0;cursor:pointer;font-size:13px;font-weight:500;line-height:20px}
+.mys-disclosure>summary:focus-visible{outline:var(--dsw-focus-ring-width,2px) solid var(--dsw-focus-ring-color,var(--dsw-alias-brand-primary));outline-offset:2px}
+.mys-disclosure>summary .mys-meta{margin-inline-start:8px;font-weight:400;color:var(--dsw-alias-label-secondary);overflow-wrap:anywhere}
+.mys-disclosure-body{display:flex;flex-direction:column;gap:12px;padding:4px 0 8px}
 .mys-badge{position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:55;display:flex;align-items:center;gap:8px;max-width:min(560px,calc(100vw - 32px));box-sizing:border-box;padding:6px 10px;border-radius:999px;font-size:12px;line-height:18px;background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-state-error-primary);border:1px solid var(--dsw-alias-state-error-secondary);pointer-events:auto}
 .mys-badge[data-tone=warn]{color:var(--dsw-alias-state-warn-label);border-color:var(--dsw-alias-state-warn-secondary)}
 .mys-badge-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -167,13 +156,14 @@ window.__ModuleLoader__.load({
       smsWidgetFailed: "人工验证未完成或加载失败。请取消后重新登录；不会自动发送短信。",
       smsSuccess: "登录成功，凭据已完成只读校验。",
       smsSuccessWarning: "游戏凭据校验通过；社区只读校验未通过，请查看社区状态。",
-      communityTitle: "上次大别野签到",
+      communityItem: '大别野',
       communityNoToken: "社区凭据不完整，请重新短信登录；不影响游戏登录。",
       communityMissingMid: "V2 社区凭据缺少必要信息，请重新短信登录；不影响游戏登录。",
       communityPartial: "上次大别野签到未完成",
-      communityAccepted: "接口已接受大别野签到；积分到账未独立验证。",
+      communityAccepted: "积分到账未独立验证。",
       communityNoResult: "尚无社区签到记录",
       communityRisk: "需要人工验证：请在米游社 App 手动处理后再决定是否重试。",
+      communityBalanceRisk: "查询米游币余额时需要人工验证，请在米游社 App 处理。",
       communityUnknown: "结果不明：请先在米游社 App 核对，不要盲目重复请求。",
       communityBalanceFail: "积分查询失败；不代表大别野签到失败。",
       communityHistorical: "历史积分快照",
@@ -196,6 +186,14 @@ window.__ModuleLoader__.load({
       title: '米游社签到',
       intro: '在同一处选择游戏与大别野签到项目，手动和定时按已保存的项目执行。登录凭据只保存在本机。',
       account: '账号',
+      accountDetails: '账号详情与诊断',
+      checkinSettings: '签到设置',
+      showTargets: '查看签到项目',
+      showAccount: '查看当前账号',
+      scheduleLogin: '待登录',
+      scheduleNoTargets: '未安排：未选项目',
+      scheduleUnplanned: '未安排',
+      gameRecordSummary: '{done}/{total} 项完成',
       accountDesc: '使用大陆 +86 手机号短信登录。凭据仅保存于本机；SToken 失效后仍需重新登录。',
       login: '短信登录',
       relogin: '重新登录',
@@ -328,7 +326,10 @@ window.__ModuleLoader__.load({
       taskStateExpired: '登录已失效',
       taskResumed: '已启用自动签到',
       taskPaused: '已暂停自动签到',
-      runTitle: '上次游戏签到',
+      runTitle: '最近签到',
+      runGameSummary: '游戏：{summary}',
+      colTarget: '签到项目',
+      colRewardOrNote: '奖励 / 说明',
       runSigned: '该记录签到成功',
       runAccounts: '个账号',
       runAuto: '是否自动签到',
@@ -377,13 +378,14 @@ window.__ModuleLoader__.load({
       smsWidgetFailed: "Verification was not completed or could not load. Cancel and sign in again. No SMS was sent automatically.",
       smsSuccess: "Signed in; read-only credential checks passed.",
       smsSuccessWarning: "Game credentials verified; the community check did not pass. See community status.",
-      communityTitle: "Last Dabieye check-in",
+      communityItem: 'Dabieye',
       communityNoToken: "Community credentials are incomplete. Sign in again by SMS; game login is unaffected.",
       communityMissingMid: "Required V2 community credentials are missing. Sign in again by SMS; game login is unaffected.",
       communityPartial: "Dabieye check-in did not complete",
-      communityAccepted: "The Dabieye check-in was accepted; coin credit has not been independently verified.",
+      communityAccepted: "Coin credit has not been independently verified.",
       communityNoResult: "No community check-in record yet",
       communityRisk: "Manual verification is required. Complete it in the Miyoushe App before deciding whether to retry.",
+      communityBalanceRisk: "Viewing the coin balance requires manual verification in the Miyoushe App.",
       communityUnknown: "Unknown result. Check in the Miyoushe App before retrying; do not blindly resend.",
       communityBalanceFail: "Coin query failed; community check-in may still have succeeded.",
       communityHistorical: "Historical coin snapshot",
@@ -406,6 +408,14 @@ window.__ModuleLoader__.load({
       title: 'miHoYo check-in',
       intro: 'Choose games and Dabieye in one place. Manual and scheduled check-ins use your saved selection. Credentials stay on this device.',
       account: 'Account',
+      accountDetails: 'Account details and diagnostics',
+      checkinSettings: 'Check-in settings',
+      showTargets: 'View check-in targets',
+      showAccount: 'View current account',
+      scheduleLogin: 'Sign-in required',
+      scheduleNoTargets: 'Not scheduled: no targets selected',
+      scheduleUnplanned: 'Not scheduled',
+      gameRecordSummary: '{done}/{total} completed',
       accountDesc: 'Sign in with a mainland China +86 mobile number. Credentials stay on this device; an expired SToken requires signing in again.',
       login: 'Sign in by SMS',
       relogin: 'Sign in again',
@@ -538,7 +548,10 @@ window.__ModuleLoader__.load({
       taskStateExpired: 'Session expired',
       taskResumed: 'Automatic check-in resumed',
       taskPaused: 'Automatic check-in paused',
-      runTitle: 'Last game check-in',
+      runTitle: 'Recent check-ins',
+      runGameSummary: 'Games: {summary}',
+      colTarget: 'Check-in target',
+      colRewardOrNote: 'Reward / note',
       runSigned: 'Successful in this record:',
       runAccounts: 'accounts',
       runAuto: 'Automatic',
@@ -660,15 +673,6 @@ window.__ModuleLoader__.load({
     }
 
     /** One accent per game, so a multi-game result list stays scannable. */
-    const GAME_ACCENT = {
-      genshin: '#4aa3df',
-      starrail: '#8b6cf0',
-      zzz: '#f08a3c',
-      honkai3: '#4d7ff0',
-      tears: '#d05a8a',
-      bh2: '#2fb3a6',
-    }
-
     function awardsText(awards) {
       if (!Array.isArray(awards) || awards.length === 0) return '—'
       return awards
@@ -688,9 +692,10 @@ window.__ModuleLoader__.load({
       })
     }
 
-    function Switch({ checked, onChange, label, disabled }) {
+    function Switch({ id, checked, onChange, label, disabled }) {
       return h('button', {
         type: 'button',
+        id,
         role: 'switch',
         'aria-checked': checked === true,
         'aria-label': label,
@@ -700,11 +705,11 @@ window.__ModuleLoader__.load({
       }, h('span', { className: 'mys-knob', 'aria-hidden': true }))
     }
 
-    function Card({ title, desc, id, children }) {
-      return h('section', { className: 'mys-card', 'aria-labelledby': id && title ? `${id}-title` : undefined, 'aria-describedby': id && desc ? `${id}-desc` : undefined },
+    function SettingsGroup({ title, desc, id, children }) {
+      return h('section', { className: 'mys-settings-group', 'aria-labelledby': id && title ? `${id}-title` : undefined, 'aria-describedby': id && desc ? `${id}-desc` : undefined },
         (title || desc) ? h('div', { className: 'mys-card-head' },
           h('div', { className: 'mys-card-head-text' },
-            title ? h(id ? 'h2' : 'div', { className: 'mys-card-title', id: id ? `${id}-title` : undefined }, title) : null,
+            title ? h('h3', { className: 'mys-card-title', id: id ? `${id}-title` : undefined }, title) : null,
             desc ? h('div', { className: 'mys-card-desc', id: id ? `${id}-desc` : undefined }, desc) : null)) : null,
         children)
     }
@@ -732,44 +737,56 @@ window.__ModuleLoader__.load({
       } catch { return formatTime(record.at) }
     }
 
+    function isCurrentCoinSnapshot(balance, balanceError) {
+      return balance?.day === scopeTime(Date.now(), COMMUNITY_ZONE) && !balanceError
+    }
+
     function CommunityResults({ t, community = {} }) {
-      const results = community.lastResult?.results ?? []
+      const { lastResult, lastError, uncertainAttempt, balance, balanceError } = community
+      const balanceText = Number.isFinite(balance?.totalPoints)
+        ? `${t('communityBalance')}：${balance.totalPoints}${isCurrentCoinSnapshot(balance, balanceError) ? '' : ` · ${t('communityHistorical')}`}`
+        : null
+      const item = lastResult?.results?.[0]
+      const captcha = lastError?.code === 'captcha' || item?.outcome === 'captcha'
+      const unknown = Boolean(uncertainAttempt) || lastError?.code === 'unknown' || item?.outcome === 'unknown'
+      const outcome = item?.outcome ?? (captcha ? 'captcha' : unknown ? 'unknown'
+        : lastError?.code || (lastResult ? lastResult.ok ? 'success' : 'error' : 'none'))
       const outcomes = {
         success: 'communityOutcomeSuccess', 'cached-success': 'communityOutcomeCached', captcha: 'communityOutcomeCaptcha',
         unknown: 'communityOutcomeUnknown', 'auth-unavailable': 'communityOutcomeAuth', expired: 'communityOutcomeExpired',
-        error: 'communityOutcomeError', skipped: 'communityOutcomeSkipped',
+        error: 'communityOutcomeError', skipped: 'communityOutcomeSkipped', none: 'communityNoResult',
       }
-      return h(Card, { title: t('communityTitle'), id: 'mys-community-record' },
-        h('div', { role: 'status', className: 'mys-meta' }, community.lastResult
-          ? t(community.lastResult.ok ? 'communityAccepted' : 'communityPartial') : t('communityNoResult')),
-        community.lastResult ? h('div', { className: 'mys-meta' }, recordTime(community.lastResult, COMMUNITY_ZONE, community.lastResult.day, t)) : null,
-        results.map((item, index) => h('div', { className: 'mys-row', key: item.gid + '-' + index },
-          h('div', { className: 'mys-row-label' },
-            h('div', null, item.label ?? item.gid), h('div', { className: 'mys-row-desc' }, item.message)),
-          h('span', { className: 'mys-tag', 'data-tone': ['success', 'cached-success'].includes(item.outcome) ? 'ok' : item.outcome === 'skipped' ? '' : 'warn' }, t(outcomes[item.outcome] ?? 'communityOutcomeError')))),
-        community.lastError?.code === 'captcha' || results.some((item) => item.outcome === 'captcha')
-          ? h('div', { className: 'mys-banner', 'data-tone': 'warn', role: 'status' }, t('communityRisk')) : null,
-        community.uncertainAttempt || community.lastError?.code === 'unknown' || results.some((item) => item.outcome === 'unknown')
-          ? h('div', { className: 'mys-banner', 'data-tone': 'warn', role: 'status' }, t('communityUnknown')) : null,
-        community.lastError && !['captcha', 'unknown'].includes(community.lastError.code)
-          ? h('div', { className: 'mys-hint', role: 'status' }, community.lastError.message) : null)
+      const accepted = outcome === 'success' || outcome === 'cached-success'
+      const diagnostic = lastError && !['captcha', 'unknown'].includes(lastError.code) ? lastError.message : null
+      const note = accepted ? t('communityAccepted') : !captcha && !unknown ? diagnostic || item?.message : null
+      const record = (item ? lastResult : null)
+        ?? (outcome === lastError?.code && Number.isFinite(lastError.at) ? lastError : null)
+        ?? (outcome === 'unknown' && Number.isFinite(uncertainAttempt?.at) ? uncertainAttempt : null)
+        ?? lastResult
+      return h('tr', null,
+        h('th', { scope: 'row' }, t('communityItem'), record
+          ? h('small', { className: 'mys-game-meta' }, recordTime(record, COMMUNITY_ZONE, record.day, t)) : null),
+        h('td', null, h('span', { className: 'mys-status', 'data-outcome': outcome }, t(outcomes[outcome] ?? 'communityOutcomeError'))),
+        h('td', null,
+          captcha ? h('div', { className: 'mys-status', 'data-outcome': 'captcha', role: 'status' }, t(accepted ? 'communityBalanceRisk' : 'communityRisk')) : null,
+          unknown ? h('div', { className: 'mys-status', 'data-outcome': 'unknown', role: 'status' }, t('communityUnknown')) : null,
+          balanceText ? h('div', null, balanceText) : null,
+          note ? h('div', null, note) : (balanceText || captcha || unknown ? null : '—')))
     }
 
     function CoinSnapshot({ t, balance, balanceError }) {
-      const current = balance?.day === scopeTime(Date.now(), COMMUNITY_ZONE) && !balanceError
+      const current = isCurrentCoinSnapshot(balance, balanceError)
       const number = (value) => typeof value === 'number' && Number.isFinite(value) ? String(value) : '—'
-      return h('section', { className: 'mys-card', 'aria-labelledby': 'mys-coin-heading' },
-        h('h2', { id: 'mys-coin-heading' }, t('coinHeading')),
+      return h('section', { className: 'mys-log-snapshot', 'aria-labelledby': 'mys-coin-heading' },
+        h('div', { className: 'mys-record-head' },
+          h('h4', { id: 'mys-coin-heading' }, t('coinHeading')),
+          h('span', { className: 'mys-record-meta' }, balance
+            ? `${t('communityBalance')}：${number(balance.totalPoints)} · ${t(current ? 'communityCurrent' : 'communityHistorical')}`
+            : t('communityNoBalance'))),
         balanceError ? h('div', { role: 'status', className: 'mys-hint' }, t('communityBalanceFail'), ' ', balanceError.message) : null,
         balance ? h('div', { className: 'mys-meta' },
-          h('div', null, t(current ? 'communityCurrent' : 'communityHistorical'), ' · ', balance.day ?? '—'),
-          h('div', null, t('communityBalance'), '：', number(balance.totalPoints)),
           h('div', null, t('communityReceived'), '：', number(balance.todayReceived), ' · ', t('communityRemaining'), '：', number(balance.todayRemaining)),
-          h('div', null, t('communitySnapshotAt'), '：', recordTime(balance, COMMUNITY_ZONE, balance.day, t))) : h('div', { className: 'mys-meta' }, t('communityNoBalance')))
-    }
-
-    function StatusDot({ state }) {
-      return h('span', { className: 'mys-dot', 'data-state': state, 'aria-hidden': true })
+          h('div', null, t('communitySnapshotAt'), '：', recordTime(balance, COMMUNITY_ZONE, balance.day, t))) : null)
     }
 
     const validRevision = (value) => typeof value === 'string'
@@ -1252,11 +1269,20 @@ window.__ModuleLoader__.load({
         }, '×'))
     }
 
+    function revealDisclosure(ref) {
+      const details = ref.current
+      if (!details) return
+      details.open = true
+      details.firstElementChild?.focus()
+    }
+
     function Section({ t, __status }) {
       const [notice, setNotice] = useState(null)
       const [busy, setBusy] = useState({ verify: false, refresh: false })
       const [verifyInfo, setVerifyInfo] = useState(null)
       const [deleteArmed, setDeleteArmed] = useState(false)
+      const settingsRef = useRef(null)
+      const accountRef = useRef(null)
       const panel = useCheckinPanel(__status)
       const { status, error, draft, runIssue, targets, runBlocked, canEdit, saveFeedback } = panel.view()
       const { refresh, patchDraft, runNow } = panel
@@ -1325,13 +1351,14 @@ window.__ModuleLoader__.load({
       const gameZone = status?.timezone ?? status?.config?.timezone ?? COMMUNITY_ZONE
       const lastResult = status?.lastResult ?? null
       const lastError = status?.lastError ?? null
+      const gameResults = lastResult?.results ?? []
+      const eligibleResults = gameResults.filter((item) => item.outcome !== 'no-role')
+      const completedResults = eligibleResults.filter((item) => item.outcome === 'signed' || item.outcome === 'already').length
 
       if (error === 'host-missing') {
         return h('div', { className: 'mys-page' },
           h('header', { className: 'mys-page-head' },
-            h('div', null,
-              h('h1', { className: 'mys-page-title' }, t('taskPanelTitle')),
-              h('p', { className: 'mys-page-intro' }, t('intro')))),
+            h('h1', { className: 'mys-page-title' }, t('taskPanelTitle'))),
           h('div', { className: 'mys-banner', 'data-tone': 'error' }, t('hostMissing')))
       }
 
@@ -1340,9 +1367,7 @@ window.__ModuleLoader__.load({
         if (code === 'LOGIN_EXPIRED') {
           return h('div', { className: 'mys-banner', 'data-tone': 'error' },
             h('div', null, t('bannerExpired')),
-            h('div', { className: 'mys-hint' }, String(lastError.message ?? '')),
-            h('div', { className: 'mys-banner-actions' },
-              h(Button, { variant: 'primary', onClick: loginFlow.startLogin, disabled: loginFlow.busy }, t('relogin'))))
+            h('div', { className: 'mys-hint' }, String(lastError.message ?? '')))
         }
         if (gameCaptcha(code)) {
           return h('div', { className: 'mys-banner', 'data-tone': 'warn' },
@@ -1362,368 +1387,319 @@ window.__ModuleLoader__.load({
       const enabled = config?.enabled === true
       const verifyValid = verifyInfo?.reachable === true && verifyInfo?.sessionValid === true
       const windowsText = (config?.windows ?? []).map((window) => `${window.start}–${window.end}`).join('、')
-      const taskState = enabled !== true
-        ? { label: t('taskStatePaused'), tone: '' }
-        : login.state === 'expired'
-          ? { label: t('taskStateExpired'), tone: 'error' }
-          : login.state === 'anonymous'
-            ? { label: t('taskStateAnonymous'), tone: 'warn' }
-            : { label: t('taskStateActive'), tone: 'ok' }
+      const loginLabel = t(login.state === 'active' ? 'stateActive' : login.state === 'expired' ? 'stateExpired' : 'stateAnonymous')
+      const reloginNeeded = login.state === 'expired' || lastError?.code === 'LOGIN_EXPIRED'
+      const needsStoken = login.state === 'active' && login.hasStoken === false
+      const communityRepair = login.state !== 'anonymous' && status?.community?.capability?.available === false
+      const loginAction = reloginNeeded ? 'relogin' : needsStoken ? 'upgradeLogin' : login.state === 'anonymous' ? 'login' : null
+      const projectsText = config === null ? '' : [
+        fill(t('gamesCount'), { count: Object.values(config.games ?? {}).filter((value) => value === true).length }),
+        config?.community?.enabled === true ? t('dabieye') : null,
+        windowsText || null,
+      ].filter(Boolean).join(' · ')
+      const scheduleText = config === null ? null
+        : !enabled ? t('taskStatePaused')
+          : login.state === 'anonymous' ? t('scheduleLogin')
+            : reloginNeeded ? t('stateExpired')
+              : targets.gameIds.length === 0 && !targets.dabieye ? t('scheduleNoTargets')
+                : targetText === null ? t('scheduleUnplanned') : `${t('nextRun')} ${targetText}（${t(reasonKey)}）`
+      const viewTargets = () => h(Button, { size: 'sm', 'aria-controls': 'mys-settings', onClick: () => revealDisclosure(settingsRef) }, t('showTargets'))
 
       return h('div', { className: 'mys-page' },
         h('header', { className: 'mys-page-head' },
-          h('div', null,
-            h('h1', { className: 'mys-page-title' }, t('taskPanelTitle')),
-            h('p', { className: 'mys-page-intro' }, t('intro'))),
-          h('div', { className: 'mys-actions' },
-            h(Button, {
-              variant: 'primary',
-              disabled: runBlocked !== null,
-              'aria-describedby': saveFeedback !== null ? 'mys-save-status' : runBlocked !== null ? 'mys-run-hint' : undefined,
-              onClick: () => runNow(targets),
-            }, runBlocked === 'runBusy' ? t('running') : t('runNow')),
-            h(Button, {
-              disabled: config === null,
-              onClick: () => patchDraft((next) => { next.enabled = !enabled; return next }),
-            }, enabled ? t('taskPause') : t('taskResume')))),
+          h('h1', { className: 'mys-page-title' }, t('taskPanelTitle')),
+          h(Button, {
+            variant: 'primary',
+            disabled: runBlocked !== null,
+            'aria-describedby': saveFeedback !== null ? 'mys-save-status' : runBlocked !== null ? 'mys-run-hint' : undefined,
+            onClick: () => runNow(targets),
+          }, runBlocked === 'runBusy' ? t('running') : t('runNow'))),
+
+        h('div', { className: 'mys-overview' },
+          h('div', { className: 'mys-account' },
+            login.avatar
+              ? h('img', { className: 'mys-avatar', src: login.avatar, alt: '', onError: (event) => { event.currentTarget.hidden = true } })
+              : login.accountName ? h('span', { className: 'mys-avatar', 'aria-hidden': true }, login.accountName.slice(0, 1)) : null,
+            login.accountName ? h('span', { className: 'mys-account-name' }, login.accountName) : null,
+            status === null ? null : h('span', {
+              className: 'mys-tag', 'data-tone': login.state === 'active' ? 'ok' : login.state === 'expired' ? 'error' : '',
+            }, loginLabel),
+            status !== null && loginAction !== null
+              ? h(Button, { size: 'sm', onClick: loginFlow.startLogin, disabled: loginFlow.busy }, t(loginFlow.busy ? 'smsBusy' : loginAction)) : null),
+          h('div', { className: 'mys-schedule-inline' },
+            h('label', { htmlFor: 'mys-auto-switch' }, t('auto')),
+            h(Switch, {
+              id: 'mys-auto-switch', checked: enabled, label: t('enabled'), disabled: !canEdit,
+              onChange: (value) => patchDraft((next) => { next.enabled = value; return next }),
+            }),
+            scheduleText === null ? null : h('span', null, scheduleText))),
 
         h('div', { id: 'mys-run-hint', role: 'status', className: 'mys-hint', hidden: runBlocked === null || runBlocked === saveFeedback }, runBlocked === null || runBlocked === saveFeedback ? '' : t(runBlocked)),
+        runBlocked === 'noTargets' ? h('div', { className: 'mys-actions' }, viewTargets()) : null,
         h('div', { id: 'mys-save-status', role: 'status', 'aria-label': t('saveFeedback'), className: 'mys-banner', 'data-tone': saveFeedback === 'saving' ? undefined : 'warn', hidden: saveFeedback === null },
           saveFeedback === null ? '' : t(saveFeedback),
           saveFeedback !== null && saveFeedback !== 'saving' && canEdit
-            ? h('div', { className: 'mys-banner-actions' }, h(Button, { size: 'sm', onClick: panel.acceptSaved }, t('useSaved'))) : null),
-        runIssue !== null ? h('div', { role: 'status', className: 'mys-banner', 'data-tone': 'warn' }, t(runIssue)) : null,
+            ? h('div', { className: 'mys-banner-actions' }, viewTargets(), h(Button, { size: 'sm', onClick: panel.acceptSaved }, t('useSaved'))) : null),
+        runIssue !== null ? h('div', { className: 'mys-banner', 'data-tone': 'warn' },
+          h('div', { role: 'status' }, t(runIssue)),
+          runIssue === 'targetsChanged' || runIssue === 'staleTargets' ? h('div', { className: 'mys-banner-actions' }, viewTargets())
+            : runIssue === 'accountChanged' ? h('div', { className: 'mys-banner-actions' },
+                h(Button, { size: 'sm', 'aria-controls': 'mys-account-details', onClick: () => revealDisclosure(accountRef) }, t('showAccount'))) : null) : null,
         error !== null ? h('div', { className: 'mys-banner', 'data-tone': 'error' }, fill(t('loadFailed'), { message: error })) : null,
         banner,
         notice !== null ? h('div', { className: 'mys-banner', 'data-tone': 'ok' }, notice) : null,
 
-        h('article', { className: 'mys-task-card' },
-          h('div', { className: 'mys-task-main' },
-            h('div', { className: 'mys-task-title' },
-              h(StatusDot, { state: login.state }),
-              h('span', null, t('taskName')),
-              h('span', { className: 'mys-tag', 'data-tone': taskState.tone }, taskState.label)),
-            h('div', { className: 'mys-task-meta' },
-              `${t('taskFrequency')}：${windowsText === '' ? '—' : `${windowsText}${t('taskRandom')}`}`),
-            h('div', { className: 'mys-task-meta' },
-              `${t('taskNextRun')}：${targetText === null ? t('noPlan') : `${targetText}（${t(reasonKey)}）`}`),
-            h('div', { className: 'mys-task-meta' },
-              `${t('taskLastRun')}：${lastResult === null ? '—' : `${recordTime(lastResult, gameZone, lastResult.date, t)} · ${lastResult.summary ?? ''}`}`))),
+        needsStoken ? h('div', { className: 'mys-banner', 'data-tone': 'warn' }, `${t('noStoken')}${t('noStokenHint')}`) : null,
+        communityRepair ? h('div', { className: 'mys-row' },
+          h('div', { className: 'mys-row-desc mys-row-label' }, t(status.community.capability.reason === 'missing-mid' ? 'communityMissingMid' : 'communityNoToken')),
+          loginAction === null ? h(Button, { size: 'sm', onClick: loginFlow.startLogin, disabled: loginFlow.busy }, t('relogin')) : null) : null,
 
-        h(Card, { title: t('account'), desc: t('accountDesc') },
-          h('div', { className: 'mys-card-head' },
-            h('div', { className: 'mys-account' },
-              login.avatar
-                ? h('img', {
-                    className: 'mys-avatar',
-                    src: login.avatar,
-                    alt: '',
-                    onError: (event) => {
-                      event.target.style.display = 'none'
-                    },
-                  })
-                : h('span', { className: 'mys-avatar', 'aria-hidden': true }, (login.accountName ?? '米').slice(0, 1)),
-              h('div', { className: 'mys-account-text' },
-                h('div', { className: 'mys-account-line' },
-                  h('span', { className: 'mys-account-name' }, login.accountName ?? t('stateAnonymous')),
-                  h('span', {
-                    className: 'mys-tag',
-                    'data-tone': login.state === 'active' ? 'ok' : login.state === 'expired' ? 'error' : '',
-                  }, login.state === 'active' ? t('stateActive') : login.state === 'expired' ? t('stateExpired') : t('stateAnonymous'))),
-                h('div', { className: 'mys-meta' }, login.uid ? `${t('uid')} ${login.uid}` : t('taskStateAnonymous')))),
-            h('div', { className: 'mys-actions' },
-              login.state === 'active' && login.hasStoken !== false
-                ? h(Button, { onClick: refreshCredentials, disabled: busy.refresh }, busy.refresh ? t('refreshing') : t('refresh'))
-                : h(Button, { variant: 'primary', onClick: loginFlow.startLogin, disabled: loginFlow.busy },
-                    loginFlow.busy
-                      ? t('smsBusy')
-                      : login.state === 'active' ? t('upgradeLogin') : login.state === 'expired' ? t('relogin') : t('login')),
-              login.state !== 'anonymous'
-                ? h(Button, { variant: 'danger', onClick: deleteLogin }, deleteArmed ? t('deleteConfirm') : t('deleteLogin'))
-                : null)),
-          login.state !== 'anonymous' ? h('div', { className: 'mys-meta' },
-            [login.loginAt ? `${t('loginAt')} ${formatTime(login.loginAt)}` : null,
-              `${t('lastRefresh')} ${login.lastRefreshAt ? formatTime(login.lastRefreshAt) : t('never')}`].filter(Boolean).join(' · ')) : null,
-          login.state === 'active' && login.hasStoken === false
-            ? h('div', { className: 'mys-banner', 'data-tone': 'warn' }, `${t('noStoken')}${t('noStokenHint')}`)
-            : null,
-          h('div', { className: 'mys-actions' },
-            h(Button, { onClick: verify, disabled: busy.verify }, busy.verify ? t('verifying') : t('verify'))),
-          verifyInfo === null ? null : h('div', {
-            className: 'mys-banner',
-            role: 'status',
-            'data-tone': verifyValid ? 'ok' : verifyInfo.reachable === null ? undefined : 'warn',
-          }, verifyInfo.reachable === false
-            ? fill(t('verifyFail'), { message: verifyInfo.message })
-            : verifyInfo.reachable === null
-              ? t('verifyAnon')
-              : verifyValid ? fill(t('verifyOk'), { ms: verifyInfo.elapsedMs ?? 0 })
-                : verifyInfo.reachable === true && verifyInfo.sessionValid === false
-                  ? fill(t('verifyInvalid'), { message: verifyInfo.message ?? '—' }) : t('verifyUnavailable'))),
+        h('div', { className: 'mys-page-section' },
+          h('div', { className: 'mys-record-head' },
+            h('h2', { id: 'mys-results-heading' }, t('runTitle')),
+            lastResult === null ? null : h('span', { className: 'mys-record-meta' },
+              fill(t('runGameSummary'), { summary: [
+                eligibleResults.length === 0 ? null : fill(t('gameRecordSummary'), { done: completedResults, total: eligibleResults.length }),
+                recordTime(lastResult, gameZone, lastResult.date, t),
+                `${t('runAuto')}：${lastResult.reason === 'schedule' ? t('yes') : t('no')}`,
+              ].filter(Boolean).join(' · ') }))),
+          h('table', { className: 'mys-game-table', 'aria-labelledby': 'mys-results-heading' },
+            h('thead', null, h('tr', null,
+              h('th', { scope: 'col' }, t('colTarget')),
+              h('th', { scope: 'col' }, t('colStatus')),
+              h('th', { scope: 'col' }, t('colRewardOrNote')))),
+            h('tbody', null,
+              gameResults.length === 0
+                ? h('tr', null, h('td', { colSpan: 3, className: 'mys-empty' }, t(lastResult === null ? 'noResult' : 'outcomeSkipped')))
+                : gameResults.map((item, index) => h('tr', { key: `${item.game}-${index}` },
+                    h('th', { scope: 'row' }, item.label ?? item.game,
+                      item.uid || typeof item.totalDays === 'number' ? h('small', { className: 'mys-game-meta' }, [
+                        item.uid ? `UID ${item.uid}` : null,
+                        typeof item.totalDays === 'number' ? `${t('colTotal')} ${item.totalDays}/25` : null,
+                      ].filter(Boolean).join(' · ')) : null),
+                    h('td', null, h('span', { className: 'mys-status', 'data-outcome': item.outcome }, t(OUTCOME_KEY[item.outcome] ?? 'outcomeError'))),
+                    h('td', null, awardsText(item.awards)))),
+              h(CommunityResults, { t, community: status?.community }))),
+          lastResult !== null && status?.community?.lastResult ? h('div', { className: 'mys-record-meta' }, t('recordNote')) : null),
 
-        h(Card, { title: t('auto'), desc: t('autoDesc') },
-          h('div', { className: 'mys-row' },
-            h('div', { className: 'mys-row-label' },
-              h('div', { className: 'mys-row-title' }, t('enabled')),
-              h('div', { className: 'mys-row-desc' }, t('gamesCount').replace('{count}', String(games.filter((game) => game.enabled).length)))),
-            h(Switch, {
-              checked: config?.enabled === true,
-              label: t('enabled'),
-              disabled: !canEdit,
-              onChange: (value) => patchDraft((next) => { next.enabled = value; return next }),
-            })),
+        h('details', { className: 'mys-disclosure', id: 'mys-settings', ref: settingsRef },
+          h('summary', null, t('checkinSettings'), projectsText === '' ? null : h('span', { className: 'mys-meta' }, projectsText)),
+          h('div', { className: 'mys-disclosure-body' },
+            h(SettingsGroup, { title: t('projects'), desc: t('projectsDesc'), id: 'mys-targets' },
+              h('div', { className: 'mys-list' },
+                games.map((game) => h('label', { className: 'mys-row', key: game.id },
+                  h('span', { className: 'mys-row-label' },
+                    h('span', { className: 'mys-row-title' }, game.label),
+                    h('span', { className: 'mys-row-desc' },
+                      game.role == null ? t('notQueried')
+                        : typeof game.role === 'object' ? `${game.role.nickname ?? ''} ${game.role.uid ?? ''} ${game.role.regionName ?? ''}`.trim()
+                          : t('noRole'))),
+                  h('input', {
+                    type: 'checkbox',
+                    checked: config?.games?.[game.id] === true,
+                    disabled: config === null,
+                    'aria-label': game.label,
+                    onChange: (event) => patchDraft((next) => { next.games[game.id] = event.target.checked; return next }),
+                  }))),
+                h('label', { className: 'mys-row' },
+                  h('span', { className: 'mys-row-label' },
+                    h('span', { className: 'mys-row-title' }, t('dabieye')),
+                    h('span', { className: 'mys-row-desc' }, t('dabieyeDesc'))),
+                  h('input', {
+                    type: 'checkbox',
+                    checked: config?.community?.enabled === true,
+                    disabled: config === null,
+                    'aria-label': t('dabieye'),
+                    onChange: (event) => patchDraft((next) => { next.community.enabled = event.target.checked; return next }),
+                  })))),
+            h(SettingsGroup, { title: t('auto'), desc: t('autoDesc') },
+              h('div', { className: 'mys-row' },
+                h('div', { className: 'mys-row-label' },
+                  h('div', { className: 'mys-row-title' }, t('windows')),
+                  h('div', { className: 'mys-row-desc' }, t('windowsDesc')))),
 
-          h('div', { className: 'mys-row' },
-            h('div', { className: 'mys-row-label' },
-              h('div', { className: 'mys-row-title' }, t('windows')),
-              h('div', { className: 'mys-row-desc' }, t('windowsDesc')))),
+              h('div', { className: 'mys-list' },
+                (config?.windows ?? []).map((window, index) => h('div', { className: 'mys-window', key: `w${index}` },
+                  h('input', {
+                    className: 'mys-time',
+                    type: 'time',
+                     disabled: !canEdit,
+                    value: window.start,
+                    'aria-label': t('windows'),
+                    onChange: (event) => patchDraft((next) => {
+                      const value = event.target.value
+                      const startMin = clockToMinutes(value)
+                      const endMin = clockToMinutes(next.windows[index].end)
+                      next.windows[index].start = value
+                      // Keep the window valid while the user is still typing: an end
+                      // at or before the start snaps to a one-minute window.
+                      if (startMin !== null && (endMin === null || endMin <= startMin)) {
+                        next.windows[index].end = minutesToClock(Math.min(1439, startMin + 1))
+                      }
+                      return next
+                    }),
+                  }),
+                  h('span', { className: 'mys-meta' }, '—'),
+                  h('input', {
+                    className: 'mys-time',
+                    type: 'time',
+                     disabled: !canEdit,
+                    value: window.end,
+                    'aria-label': t('windows'),
+                    onChange: (event) => patchDraft((next) => {
+                      const value = event.target.value
+                      const startMin = clockToMinutes(next.windows[index].start)
+                      const endMin = clockToMinutes(value)
+                      next.windows[index].end = endMin !== null && startMin !== null && endMin <= startMin
+                        ? minutesToClock(startMin + 1)
+                        : value
+                      return next
+                    }),
+                  }),
+                  h(Button, {
+                    variant: 'danger',
+                    size: 'sm',
+                    disabled: !canEdit || (config?.windows ?? []).length <= 1,
+                    onClick: () => patchDraft((next) => {
+                      if (next.windows.length > 1) next.windows.splice(index, 1)
+                      return next
+                    }),
+                  }, t('remove'))))),
 
-          h('div', { className: 'mys-list' },
-            (config?.windows ?? []).map((window, index) => h('div', { className: 'mys-window', key: `w${index}` },
-              h('input', {
-                className: 'mys-time',
-                type: 'time',
-                 disabled: !canEdit,
-                value: window.start,
-                'aria-label': t('windows'),
-                onChange: (event) => patchDraft((next) => {
-                  const value = event.target.value
-                  const startMin = clockToMinutes(value)
-                  const endMin = clockToMinutes(next.windows[index].end)
-                  next.windows[index].start = value
-                  // Keep the window valid while the user is still typing: an end
-                  // at or before the start snaps to a one-minute window.
-                  if (startMin !== null && (endMin === null || endMin <= startMin)) {
-                    next.windows[index].end = minutesToClock(Math.min(1439, startMin + 1))
-                  }
-                  return next
-                }),
-              }),
-              h('span', { className: 'mys-meta' }, '—'),
-              h('input', {
-                className: 'mys-time',
-                type: 'time',
-                 disabled: !canEdit,
-                value: window.end,
-                'aria-label': t('windows'),
-                onChange: (event) => patchDraft((next) => {
-                  const value = event.target.value
-                  const startMin = clockToMinutes(next.windows[index].start)
-                  const endMin = clockToMinutes(value)
-                  next.windows[index].end = endMin !== null && startMin !== null && endMin <= startMin
-                    ? minutesToClock(startMin + 1)
-                    : value
-                  return next
-                }),
-              }),
-              h(Button, {
-                variant: 'danger',
-                size: 'sm',
-                disabled: !canEdit || (config?.windows ?? []).length <= 1,
-                onClick: () => patchDraft((next) => {
-                  if (next.windows.length > 1) next.windows.splice(index, 1)
-                  return next
-                }),
-              }, t('remove'))))),
+              h('div', { className: 'mys-actions' },
+                h(Button, {
+                  size: 'sm',
+                  disabled: !canEdit || (config?.windows ?? []).length >= 4,
+                  onClick: () => patchDraft((next) => {
+                    if (next.windows.length >= 4) return next
+                    const last = next.windows[next.windows.length - 1] ?? { start: '18:00', end: '18:30' }
+                    const lastStart = clockToMinutes(last.start) ?? 1080
+                    const lastEnd = clockToMinutes(last.end) ?? lastStart + 30
+                    const span = Math.min(120, Math.max(1, lastEnd - lastStart))
+                    // Offset the new window so it is immediately usable; duplicate
+                    // times are allowed, this is only a convenience.
+                    let start = lastStart + 60
+                    if (start + span > 1439) start = 1439 - span
+                    next.windows.push({ start: minutesToClock(start), end: minutesToClock(start + span) })
+                    return next
+                  }),
+                }, t('addWindow'))),
 
-          h('div', { className: 'mys-actions' },
-            h(Button, {
-              size: 'sm',
-              disabled: !canEdit || (config?.windows ?? []).length >= 4,
-              onClick: () => patchDraft((next) => {
-                if (next.windows.length >= 4) return next
-                const last = next.windows[next.windows.length - 1] ?? { start: '18:00', end: '18:30' }
-                const lastStart = clockToMinutes(last.start) ?? 1080
-                const lastEnd = clockToMinutes(last.end) ?? lastStart + 30
-                const span = Math.min(120, Math.max(1, lastEnd - lastStart))
-                // Offset the new window so it is immediately usable; duplicate
-                // times are allowed, this is only a convenience.
-                let start = lastStart + 60
-                if (start + span > 1439) start = 1439 - span
-                next.windows.push({ start: minutesToClock(start), end: minutesToClock(start + span) })
-                return next
-              }),
-            }, t('addWindow'))),
+              h('div', { className: 'mys-row' },
+                h('div', { className: 'mys-row-label' },
+                  h('div', { className: 'mys-row-title' }, t('runWhenMissed')),
+                  h('div', { className: 'mys-row-desc' }, t('runWhenMissedDesc'))),
+                h(Switch, {
+                  checked: config?.runWhenMissed === true,
+                  label: t('runWhenMissed'),
+                  disabled: !canEdit,
+                  onChange: (value) => patchDraft((next) => { next.runWhenMissed = value; return next }),
+                }))),
+            h('details', { className: 'mys-details' },
+              h('summary', null, t('advanced')),
+              h('div', { className: 'mys-grid' },
+                h('label', { className: 'mys-field' }, t('timezone'),
+                  h('input', {
+                    className: 'mys-input',
+                    disabled: !canEdit,
+                    value: draft?.timezone ?? '',
+                    onChange: (event) => patchDraft((next) => { next.timezone = event.target.value; return next }),
+                  })),
+                h('label', { className: 'mys-field' }, t('appVersion'),
+                  h('input', {
+                    className: 'mys-input',
+                    disabled: !canEdit,
+                    value: draft?.client?.appVersion ?? '',
+                    onChange: (event) => patchDraft((next) => { next.client.appVersion = event.target.value; return next }),
+                  })),
+                h('label', { className: 'mys-field' }, t('salt'),
+                  h('input', {
+                    className: 'mys-input',
+                    disabled: !canEdit,
+                    value: draft?.client?.salt ?? '',
+                    onChange: (event) => patchDraft((next) => { next.client.salt = event.target.value; return next }),
+                  })),
+                h('label', { className: 'mys-field' }, `${t('gap')} · ${t('gapMin')}`,
+                  h('input', {
+                    className: 'mys-input',
+                    disabled: !canEdit,
+                    type: 'number',
+                    min: 1,
+                    max: 60,
+                    value: Math.round((draft?.gapMs?.min ?? 2000) / 1000),
+                    onChange: (event) => patchDraft((next) => { next.gapMs.min = Math.max(1, Number(event.target.value) || 1) * 1000; return next }),
+                  })),
+                h('label', { className: 'mys-field' }, `${t('gap')} · ${t('gapMax')}`,
+                  h('input', {
+                    className: 'mys-input',
+                    disabled: !canEdit,
+                    type: 'number',
+                    min: 1,
+                    max: 120,
+                    value: Math.round((draft?.gapMs?.max ?? 8000) / 1000),
+                    onChange: (event) => patchDraft((next) => { next.gapMs.max = Math.max(1, Number(event.target.value) || 1) * 1000; return next }),
+                  })),
+                h('label', { className: 'mys-field' }, `${t('retry')} · ${t('retryAttempts')}`,
+                  h('input', {
+                    className: 'mys-input',
+                    disabled: !canEdit,
+                    type: 'number',
+                    min: 0,
+                    max: 3,
+                    value: draft?.retry?.attempts ?? 1,
+                    onChange: (event) => patchDraft((next) => { next.retry.attempts = Number(event.target.value) || 0; return next }),
+                  })),
+                h('label', { className: 'mys-field' }, `${t('retry')} · ${t('retryDelay')}`,
+                  h('input', {
+                    className: 'mys-input',
+                    disabled: !canEdit,
+                    type: 'number',
+                    min: 10,
+                    max: 900,
+                    value: Math.round((draft?.retry?.delayMs ?? 60000) / 1000),
+                    onChange: (event) => patchDraft((next) => { next.retry.delayMs = Math.max(10, Number(event.target.value) || 60) * 1000; return next }),
+                  })),
+                h('div', { className: 'mys-hint' }, t('appVersionDesc')))))),
 
-          h('div', { className: 'mys-row' },
-            h('div', { className: 'mys-row-label' },
-              h('div', { className: 'mys-row-title' }, t('runWhenMissed')),
-              h('div', { className: 'mys-row-desc' }, t('runWhenMissedDesc'))),
-            h(Switch, {
-              checked: config?.runWhenMissed === true,
-              label: t('runWhenMissed'),
-              disabled: !canEdit,
-              onChange: (value) => patchDraft((next) => { next.runWhenMissed = value; return next }),
-            })),
-
-          h('div', { className: 'mys-meta' },
-            `${t('nextRun')}：${targetText === null ? t('noPlan') : `${targetText}（${t(reasonKey)}）`}`)),
-
-        h(Card, { title: t('projects'), desc: t('projectsDesc'), id: 'mys-targets' },
-          h('div', { className: 'mys-list' },
-            games.map((game) => h('label', { className: 'mys-row', key: game.id },
-              h('span', { className: 'mys-row-label' },
-                h('span', { className: 'mys-row-title' }, game.label),
-                h('span', { className: 'mys-row-desc' },
-                  game.role == null ? t('notQueried')
-                    : typeof game.role === 'object' ? `${game.role.nickname ?? ''} ${game.role.uid ?? ''} ${game.role.regionName ?? ''}`.trim()
-                      : t('noRole'))),
-              h('input', {
-                type: 'checkbox',
-                checked: config?.games?.[game.id] === true,
-                disabled: config === null,
-                'aria-label': game.label,
-                onChange: (event) => patchDraft((next) => { next.games[game.id] = event.target.checked; return next }),
-              }))),
-            h('label', { className: 'mys-row' },
-              h('span', { className: 'mys-row-label' },
-                h('span', { className: 'mys-row-title' }, t('dabieye')),
-                h('span', { className: 'mys-row-desc' }, t('dabieyeDesc'))),
-              h('input', {
-                type: 'checkbox',
-                checked: config?.community?.enabled === true,
-                disabled: config === null,
-                'aria-label': t('dabieye'),
-                onChange: (event) => patchDraft((next) => { next.community.enabled = event.target.checked; return next }),
-              }))),
-          login.state !== 'anonymous' && status?.community?.capability?.available === false
-            ? h('div', { className: 'mys-row' },
-                h('div', { className: 'mys-row-desc mys-row-label' }, t(status.community.capability.reason === 'missing-mid' ? 'communityMissingMid' : 'communityNoToken')),
-                h(Button, { size: 'sm', onClick: loginFlow.startLogin, disabled: loginFlow.busy }, t('relogin')))
-            : null),
-
-        h('section', { className: 'mys-page-section' },
-          h('h2', null, t('taskRunHistory')),
-          h('div', { className: 'mys-hint' }, t('recordNote')),
-          h('h2', null, t('runTitle')),
-          lastResult === null
-            ? h('div', { className: 'mys-empty' }, t('noResult'))
-            : (() => {
-                const results = lastResult.results ?? []
-                const roled = results.filter((item) => item.outcome !== 'no-role')
-                const done = roled.filter((item) => item.outcome === 'signed' || item.outcome === 'already').length
-                const total = roled.length
-                const allDone = total > 0 && done === total
-                const timeText = recordTime(lastResult, gameZone, lastResult.date, t)
-                return h('div', { className: 'mys-run' },
-                  h('div', { className: 'mys-summary' },
-                    h('div', { className: 'mys-summary-mark', 'aria-hidden': true, 'data-done': allDone }, allDone ? '✓' : '–'),
-                    h('div', { className: 'mys-summary-main' },
-                      h('div', { className: 'mys-summary-sub' }, `${t('runSigned')} `, h('b', null, String(done)), ` ${t('runAccounts')}`),
-                      h('div', { className: 'mys-summary-sub' },
-                        `${t('runAuto')}：${lastResult.reason === 'schedule' ? t('yes') : t('no')} | ${t('runAt')}：${timeText}`)),
-                    h('div', { className: 'mys-summary-score' },
-                      h('div', { className: 'mys-summary-count' }, `${done}/${total}`),
-                      h('div', { className: 'mys-summary-badge', 'data-done': allDone ? 'true' : 'false' },
-                        allDone ? t('runDone') : t('runPartial')))),
-                  results.map((item, index) => h('article', {
-                    className: 'mys-game',
-                    key: `${item.game}-${index}`,
-                    style: { '--mys-accent': GAME_ACCENT[item.game] ?? '#6b7280' },
+        h('details', { className: 'mys-disclosure', id: 'mys-account-details', ref: accountRef },
+          h('summary', null, t('accountDetails')),
+          h('div', { className: 'mys-disclosure-body' },
+            h(SettingsGroup, { title: t('account'), desc: t('accountDesc') },
+              login.uid ? h('div', { className: 'mys-meta' }, `${t('uid')} ${login.uid}`) : null,
+              login.state !== 'anonymous' ? h('div', { className: 'mys-meta' },
+                [login.loginAt ? `${t('loginAt')} ${formatTime(login.loginAt)}` : null,
+                  `${t('lastRefresh')} ${login.lastRefreshAt ? formatTime(login.lastRefreshAt) : t('never')}`].filter(Boolean).join(' · ')) : null,
+              h('div', { className: 'mys-actions' },
+                login.state === 'active' && !needsStoken
+                  ? h(Button, { onClick: refreshCredentials, disabled: busy.refresh }, busy.refresh ? t('refreshing') : t('refresh')) : null,
+                login.state !== 'anonymous'
+                  ? h(Button, { variant: 'danger', onClick: deleteLogin }, deleteArmed ? t('deleteConfirm') : t('deleteLogin')) : null),
+              h('div', { className: 'mys-actions' },
+                h(Button, { onClick: verify, disabled: busy.verify }, busy.verify ? t('verifying') : t('verify'))),
+              verifyInfo === null ? null : h('div', {
+                className: 'mys-banner',
+                role: 'status',
+                'data-tone': verifyValid ? 'ok' : verifyInfo.reachable === null ? undefined : 'warn',
+              }, verifyInfo.reachable === false
+                ? fill(t('verifyFail'), { message: verifyInfo.message })
+                : verifyInfo.reachable === null
+                  ? t('verifyAnon')
+                  : verifyValid ? fill(t('verifyOk'), { ms: verifyInfo.elapsedMs ?? 0 })
+                    : verifyInfo.reachable === true && verifyInfo.sessionValid === false
+                      ? fill(t('verifyInvalid'), { message: verifyInfo.message ?? '—' }) : t('verifyUnavailable'))),
+            h(SettingsGroup, { title: t('logs'), id: 'mys-log-group' },
+               h(CoinSnapshot, { t, balance: status?.community?.balance, balanceError: status?.community?.balanceError }),
+              (status?.logs ?? []).length === 0
+                ? h('div', { className: 'mys-empty' }, t('logsEmpty'))
+                : h('div', { className: 'mys-logs' }, (status?.logs ?? []).slice().reverse().map((entry, index) => h('div', {
+                    className: 'mys-log',
+                    'data-level': entry.level,
+                    key: `${entry.at}-${index}`,
                   },
-                  h('div', { className: 'mys-game-head' },
-                    h('span', { className: 'mys-game-bar', 'aria-hidden': true }),
-                    h('span', { className: 'mys-game-name' }, item.label ?? item.game),
-                    h('span', { className: 'mys-game-count' },
-                      `${item.uid === undefined || item.uid === '' ? 0 : 1}${t('runAccountUnit')}`)),
-                  h('table', { className: 'mys-game-table' },
-                    h('thead', null, h('tr', null,
-                      h('th', null, 'UID'),
-                      h('th', null, t('colStatus')),
-                      h('th', null, t('colReward')),
-                      h('th', null, t('colTotal')))),
-                    h('tbody', null, h('tr', null,
-                      h('td', null, item.uid ?? '—'),
-                      h('td', null, h('span', {
-                        className: 'mys-status',
-                        'data-outcome': item.outcome,
-                      }, `${item.outcome === 'signed' || item.outcome === 'already' ? '✓ ' : ''}${t(OUTCOME_KEY[item.outcome] ?? 'outcomeError')}`)),
-                      h('td', null, awardsText(item.awards)),
-                      h('td', null, typeof item.totalDays === 'number' ? `${item.totalDays}/25` : '—')))))),
-                  h('div', { className: 'mys-run-foot' }, allDone ? t('runFooterDone') : t('runFooterPartial')))
-               })(),
-          h(CommunityResults, { t, community: status?.community })),
-        h('div', { className: 'mys-page-section' }, h(CoinSnapshot, { t, balance: status?.community?.balance, balanceError: status?.community?.balanceError })),
-
-        h('details', { className: 'mys-details' },
-          h('summary', null, t('advanced')),
-          h('div', { className: 'mys-grid' },
-            h('label', { className: 'mys-field' }, t('timezone'),
-              h('input', {
-                className: 'mys-input',
-                disabled: !canEdit,
-                value: draft?.timezone ?? '',
-                onChange: (event) => patchDraft((next) => { next.timezone = event.target.value; return next }),
-              })),
-            h('label', { className: 'mys-field' }, t('appVersion'),
-              h('input', {
-                className: 'mys-input',
-                disabled: !canEdit,
-                value: draft?.client?.appVersion ?? '',
-                onChange: (event) => patchDraft((next) => { next.client.appVersion = event.target.value; return next }),
-              })),
-            h('label', { className: 'mys-field' }, t('salt'),
-              h('input', {
-                className: 'mys-input',
-                disabled: !canEdit,
-                value: draft?.client?.salt ?? '',
-                onChange: (event) => patchDraft((next) => { next.client.salt = event.target.value; return next }),
-              })),
-            h('label', { className: 'mys-field' }, `${t('gap')} · ${t('gapMin')}`,
-              h('input', {
-                className: 'mys-input',
-                disabled: !canEdit,
-                type: 'number',
-                min: 1,
-                max: 60,
-                value: Math.round((draft?.gapMs?.min ?? 2000) / 1000),
-                onChange: (event) => patchDraft((next) => { next.gapMs.min = Math.max(1, Number(event.target.value) || 1) * 1000; return next }),
-              })),
-            h('label', { className: 'mys-field' }, `${t('gap')} · ${t('gapMax')}`,
-              h('input', {
-                className: 'mys-input',
-                disabled: !canEdit,
-                type: 'number',
-                min: 1,
-                max: 120,
-                value: Math.round((draft?.gapMs?.max ?? 8000) / 1000),
-                onChange: (event) => patchDraft((next) => { next.gapMs.max = Math.max(1, Number(event.target.value) || 1) * 1000; return next }),
-              })),
-            h('label', { className: 'mys-field' }, `${t('retry')} · ${t('retryAttempts')}`,
-              h('input', {
-                className: 'mys-input',
-                disabled: !canEdit,
-                type: 'number',
-                min: 0,
-                max: 3,
-                value: draft?.retry?.attempts ?? 1,
-                onChange: (event) => patchDraft((next) => { next.retry.attempts = Number(event.target.value) || 0; return next }),
-              })),
-            h('label', { className: 'mys-field' }, `${t('retry')} · ${t('retryDelay')}`,
-              h('input', {
-                className: 'mys-input',
-                disabled: !canEdit,
-                type: 'number',
-                min: 10,
-                max: 900,
-                value: Math.round((draft?.retry?.delayMs ?? 60000) / 1000),
-                onChange: (event) => patchDraft((next) => { next.retry.delayMs = Math.max(10, Number(event.target.value) || 60) * 1000; return next }),
-              })),
-            h('div', { className: 'mys-hint' }, t('appVersionDesc')))),
-
-        h(Card, { title: t('logs') },
-          (status?.logs ?? []).length === 0
-            ? h('div', { className: 'mys-empty' }, t('logsEmpty'))
-            : h('div', { className: 'mys-logs' }, (status?.logs ?? []).slice().reverse().map((entry, index) => h('div', {
-                className: 'mys-log',
-                'data-level': entry.level,
-                key: `${entry.at}-${index}`,
-              },
-              h('span', { className: 'mys-log-time' }, shortTime(entry.at)),
-              h('span', { className: 'mys-log-text' }, entry.message))))),
-
-        h(Card, { title: t('riskTitle') },
-          h('div', { className: 'mys-hint' }, t('riskList'))),
+                  h('span', { className: 'mys-log-time' }, shortTime(entry.at)),
+                  h('span', { className: 'mys-log-text' }, entry.message))))),
+            h(SettingsGroup, { title: t('riskTitle') },
+              h('div', { className: 'mys-hint' }, t('riskList'))))),
 
         loginFlow.session === null ? null : h(SmsDialog, { t, session: loginFlow.session, controller: loginFlow.controller }))
     }
