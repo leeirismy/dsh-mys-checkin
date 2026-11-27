@@ -59,11 +59,10 @@ function installFakeNetwork(options = {}) {
     if (url.includes('/createLoginCaptcha')) return jsonResponse({ retcode: options.sendFails ? -1 : 0, data: { action_type: 'login', countdown: 60 } })
     if (url.includes('/loginByMobileCaptcha')) return jsonResponse({ retcode: 0, data: { user_info: { aid: '100200300', mid: 'mid_9000' }, token: { token_type: 1, token: 'v2_stoken' } } })
     if (url.includes('/getUserMissionsState')) return jsonResponse({ retcode: 0, data: { states: [], total_points: 0, already_received_points: 0, can_get_points: 0 } })
-    if (url.includes('/getCookieAccountInfoBySToken')) {
-      return jsonResponse({ retcode: 0, message: 'ok', data: { uid: '100200300', cookie_token: options.v1Tokens === true ? 'v1_cookie' : 'v2_cookie' } })
-    }
-    if (url.includes('/getLTokenBySToken')) {
-      return jsonResponse({ retcode: 0, message: 'ok', data: { ltoken: options.v1Tokens === true ? 'v1_ltoken' : 'v2_ltoken' } })
+    if (url.endsWith('/app/exchange')) {
+      const type = JSON.parse(init.body).dst_token_type
+      const token = type === 2 ? 'ltoken' : 'cookie'
+      return jsonResponse({ retcode: 0, data: { user_info: { aid: '100200300', mid: 'mid_9000' }, token: { token_type: type, token: (options.opaqueTokens ? 'opaque_' : 'v2_') + token } } })
     }
     if (url.includes('/binding/api/getUserGameRolesByCookie')) {
       const biz = new URL(url).searchParams.get('game_biz')
@@ -178,7 +177,7 @@ test('SMS login exchanges the root token before accepting a validated session', 
   assert.equal(confirmed.state, 'confirmed')
 
   assert.equal(network.calls.some((call) => call.url.includes('/app/loginByMobileCaptcha')), true)
-  assert.equal(network.calls.some((call) => call.url.includes('/getLTokenBySToken')), true)
+  assert.equal(network.calls.some((call) => call.url.endsWith('/app/exchange') && JSON.parse(call.body).dst_token_type === 2), true)
 
   const after = await service.routeStatus()
   assert.equal(after.login.state, 'active')
@@ -188,9 +187,9 @@ test('SMS login exchanges the root token before accepting a validated session', 
   assert.equal(service.state.auth.cookies.cookie_token_v2, 'v2_cookie')
 })
 
-test('SMS login pairs a V1 ltoken with ltuid/account_id', async (t) => {
+test('V2 ticket type determines the Cookie key even for opaque token values', async (t) => {
   freshHome()
-  const network = installFakeNetwork({ stokenOnly: true, v1Tokens: true })
+  const network = installFakeNetwork({ stokenOnly: true, opaqueTokens: true })
   t.after(() => network.restore())
 
   const ctx = createCtx()
@@ -201,15 +200,15 @@ test('SMS login pairs a V1 ltoken with ltuid/account_id', async (t) => {
   assert.equal(confirmed.state, 'confirmed')
 
   const cookies = service.state.auth.cookies
-  assert.equal(cookies.ltoken, 'v1_ltoken')
-  assert.equal(cookies.cookie_token, 'v1_cookie')
-  assert.equal(cookies.ltuid, '100200300')
-  assert.equal(cookies.account_id, '100200300')
+  assert.equal(cookies.ltoken_v2, 'opaque_ltoken')
+  assert.equal(cookies.cookie_token_v2, 'opaque_cookie')
+  assert.equal(cookies.ltuid_v2, '100200300')
+  assert.equal(cookies.account_id_v2, '100200300')
 
-  // The verification call proves the V1 pair actually travels on the wire.
+  // The validation call also consumes V2 fields.
   const binding = network.calls.filter((call) => call.url.includes('/binding/api/getUserGameRolesByCookie')).at(-1)
-  assert.match(binding.headers.Cookie, /ltuid=100200300/)
-  assert.match(binding.headers.Cookie, /ltoken=v1_ltoken/)
+  assert.match(binding.headers.Cookie, /ltuid_v2=100200300/)
+  assert.match(binding.headers.Cookie, /ltoken_v2=opaque_ltoken/)
 })
 
 test('failed SMS send does not silently choose another login channel or retry', async (t) => {

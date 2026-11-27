@@ -27,9 +27,11 @@ function setup(t, options = {}) {
     const custom = await options.handle?.(call)
     if (custom) return custom
     if (url.pathname.endsWith('/createLoginCaptcha')) return success({ action_type: 'login', countdown: 60 })
-    if (url.pathname.endsWith('/loginByMobileCaptcha')) return success({ token: { token_type: 1, token: 'NEW_STOKEN' }, user_info: { aid: '456', mid: 'NEW_MID' } })
-    if (url.pathname.endsWith('/getLTokenBySToken')) return success({ ltoken: 'NEW_LTOKEN' })
-    if (url.pathname.endsWith('/getCookieAccountInfoBySToken')) return success({ uid: '456', cookie_token: 'NEW_COOKIE' })
+    if (url.pathname.endsWith('/loginByMobileCaptcha')) return success({ token: { token_type: 1, token: 'v2_NEW_STOKEN' }, user_info: { aid: '456', mid: 'NEW_MID' } })
+    if (url.pathname.endsWith('/app/exchange')) {
+      const type = JSON.parse(init.body).dst_token_type
+      return success({ user_info: { aid: '456', mid: 'NEW_MID' }, token: { token_type: type, token: type === 2 ? 'NEW_LTOKEN' : 'NEW_COOKIE' } })
+    }
     if (url.pathname.endsWith('/getUserGameRolesByCookie')) return success({ list: [] })
     if (url.pathname.endsWith('/getUserMissionsState')) return success({ states: [], total_points: 100, already_received_points: 0, can_get_points: 90 })
     if (url.pathname.endsWith('/getUserFullInfo')) return success({ user: { user_info: { nickname: 'Cosmetic' } } })
@@ -99,12 +101,12 @@ test('valid candidate replaces auth and account runtime only after strict checks
   assert.equal(result.ok, true)
   assert.equal(result.state, 'confirmed')
   assert.equal(service.state.auth.aid, '456')
-  assert.equal(service.state.auth.cookies.ltoken, 'NEW_LTOKEN')
-  assert.equal(service.state.auth.cookies.cookie_token, 'NEW_COOKIE')
+  assert.equal(service.state.auth.cookies.ltoken_v2, 'NEW_LTOKEN')
+  assert.equal(service.state.auth.cookies.cookie_token_v2, 'NEW_COOKIE')
   assert.equal(service.state.runtime.lastResult, null)
   assert.equal(service.statusPayload().loginFlow, null)
   const query = calls.find(c => c.path.endsWith('/getUserMissionsState'))
-  assert.equal(query.headers.Cookie, 'account_id=456; cookie_token=NEW_COOKIE')
+  assert.equal(query.headers.Cookie, 'account_id_v2=456; account_mid_v2=NEW_MID; cookie_token_v2=NEW_COOKIE')
   assert.equal(calls.some(c => /\/sign(?:In)?$/.test(c.path)), false)
   const publicText = JSON.stringify(result)
   for (const secret of ['NEW_LTOKEN', 'NEW_COOKIE', 'NEW_STOKEN', 'NEW_MID', '13800138000', '123456', 'OLD_STOKEN']) assert.equal(publicText.includes(secret), false)
@@ -113,8 +115,8 @@ test('valid candidate replaces auth and account runtime only after strict checks
 for (const [stage, bad] of [
   ['createLoginCaptcha', () => response({ retcode: -1 })],
   ['loginByMobileCaptcha', () => response({ retcode: -1, message: 'SECRET' })],
-  ['getLTokenBySToken', () => success({ ltoken: '' })],
-  ['getCookieAccountInfoBySToken', () => success({ uid: '999', cookie_token: 'NEW_COOKIE' })],
+  [2, () => success({ user_info: { aid: '456', mid: 'NEW_MID' }, token: { token_type: 2, token: '' } })],
+  [4, () => success({ user_info: { aid: '999', mid: 'NEW_MID' }, token: { token_type: 4, token: 'NEW_COOKIE' } })],
   ['getUserGameRolesByCookie', () => response({ retcode: -100 })],
   ['getUserGameRolesByCookie', () => success({})],
   ['getUserGameRolesByCookie', () => success({ list: [null] })],
@@ -128,7 +130,7 @@ for (const [stage, bad] of [
   ['getUserGameRolesByCookie', () => new Response(JSON.stringify({ retcode: 0, data: { list: [] } }), { headers: { 'x-rpc-aigis': 'challenge' } })],
   ['getUserMissionsState', () => new Response(JSON.stringify({ retcode: 0, data: { states: [], total_points: 0, already_received_points: 0, can_get_points: 0 } }), { headers: { 'x-rpc-aigis': 'challenge' } })],
 ]) test(`failure at ${stage} (${bad().status}) preserves old auth and runtime`, async (t) => {
-  const { service } = setup(t, { handle: c => c.path.endsWith(`/${stage}`) ? bad() : null })
+  const { service } = setup(t, { handle: c => (c.path.endsWith(`/${stage}`) || c.path.endsWith('/app/exchange') && JSON.parse(c.body).dst_token_type === stage) ? bad() : null })
   const before = structuredClone(service.state.auth)
   const start = await service.routeLoginStart(req('start', { phone: '13800138000' }))
   assert.equal(start.ok, true)
@@ -207,6 +209,17 @@ test('wrong code preserves the old account and allows an explicit retry without 
   const retried = await service.routeLoginSubmit(req('submit', { flowId, code: '123456' }))
   assert.equal(retried.state, 'confirmed')
   assert.equal(calls.filter(c => c.path.endsWith('/createLoginCaptcha')).length, 1)
+})
+
+test('SMS GT4 with empty optional fields opens the manual challenge instead of confirming dispatch', async t => {
+  const { service, calls } = setup(t, { handle: c => c.path.endsWith('/createLoginCaptcha') ? new Response(JSON.stringify({ retcode: -3101, data: null }), { headers: {
+    'x-rpc-aigis': JSON.stringify({ session_id: 'fixture', mmt_type: 1, data: JSON.stringify({ gt: 'site', use_v4: 1, challenge: '', risk_type: '' }) }),
+  } }) : null })
+  const { flow } = await service.routeLoginStart(req('start', { phone: '13800138000' }))
+  const result = await service.routeLoginSend(req('send', { flowId: flow.flowId }))
+  assert.equal(result.flow.status, 'verification-required'); assert.equal(result.flow.challenge.checkpoint, 'sms')
+  assert.equal(result.challenge.version, 'gt4'); assert.equal(result.challenge.config.captchaId, 'site')
+  assert.equal(calls.length, 1); assert.deepEqual(service.state.auth, OLD)
 })
 
 test('unknown SMS POST outcome is not retried or disclosed; cooldown survives replacing the flow', async (t) => {

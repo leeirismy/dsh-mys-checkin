@@ -9,6 +9,8 @@ import { normalizeConfig } from '../lib/config.js'
 const request = (route = 'logout', body = {}) => new Request(`http://owner.invalid/api/mys/${route}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
 const reply = (body) => new Response(JSON.stringify(body), { status: 200 })
 const rolePath = '/binding/api/getUserGameRolesByCookie'
+const exchangePath = '/account/ma-cn-session/app/exchange'
+const exchangeReply = (type, aid = '123') => reply({ retcode: 0, data: { user_info: { aid, mid: 'secret-mid' }, token: { token_type: type, token: `opaque-ticket-${type}` } } })
 const infoPath = '/event/luna/hk4e/info'
 const gameSignPath = '/event/luna/hk4e/sign'
 const communitySignPath = '/apihub/app/api/signIn'
@@ -258,7 +260,7 @@ test('late role lookup cannot write a cache or send a game sign after logout', a
 test('logout while refreshing prevents the second token request and resurrection of credentials', async (t) => {
   const entered = deferred(), release = deferred()
   const { service, calls } = setup(t, async ({ pathname }) => {
-    if (pathname.endsWith('/getCookieAccountInfoBySToken')) { entered.resolve(); await release.promise; return reply({ retcode: 0, data: { cookie_token: 'secret-new-cookie' } }) }
+    if (pathname === exchangePath) { entered.resolve(); await release.promise; return exchangeReply(2) }
   })
   const refreshing = service.routeRefresh(request('refresh')); await entered.promise
   await service.routeLogout(request()); release.resolve(); await refreshing
@@ -268,9 +270,8 @@ test('logout while refreshing prevents the second token request and resurrection
 })
 
 test('normal token refresh keeps the same generation and cannot clear community-specific state', async (t) => {
-  const { service } = setup(t, ({ pathname }) => {
-    if (pathname.endsWith('/getCookieAccountInfoBySToken')) return reply({ retcode: 0, data: { cookie_token: 'synthetic-cookie' } })
-    if (pathname.endsWith('/getLTokenBySToken')) return reply({ retcode: 0, data: { ltoken: 'synthetic-ltoken' } })
+  const { service } = setup(t, ({ pathname, init }) => {
+    if (pathname === exchangePath) return exchangeReply(JSON.parse(init.body).dst_token_type)
   })
   const generation = service.authGeneration
   service.state.runtime.community.lastError = { code: 'expired', message: 'Synthetic community expiry' }
@@ -279,11 +280,33 @@ test('normal token refresh keeps the same generation and cannot clear community-
   assert.equal(service.state.runtime.community.lastError.code, 'expired')
 })
 
+test('manual refresh replaces both obsolete tickets together, but not on partial failure or legacy roots', async t => {
+  let rejectSecond = true
+  const { service, calls } = setup(t, ({ pathname, init }) => {
+    if (pathname !== exchangePath) return undefined
+    const type = JSON.parse(init.body).dst_token_type
+    return type === 4 && rejectSecond ? reply({ retcode: 1002 }) : exchangeReply(type)
+  })
+  const old = structuredClone(service.state.auth)
+  assert.equal((await service.routeRefresh(request('refresh'))).ok, false)
+  assert.deepEqual(service.state.auth, old)
+  rejectSecond = false
+  assert.equal((await service.routeRefresh(request('refresh'))).ok, true)
+  assert.equal(service.state.auth.cookies.ltoken, undefined)
+  assert.equal(service.state.auth.cookies.ltoken_v2, 'opaque-ticket-2')
+  assert.equal(service.state.auth.cookies.cookie_token_v2, 'opaque-ticket-4')
+  for (const cookies of [{ ...old.cookies, stoken: 'legacy' }, { ...old.cookies, mid: '' }]) {
+    service.store.setAuth({ ...old, mid: cookies.mid, cookies }); const n = calls.length
+    assert.equal((await service.routeRefresh(request('refresh'))).ok, false)
+    assert.deepEqual(service.state.auth.cookies, cookies); assert.equal(calls.length, n)
+  }
+})
+
 test('game automatic refresh cannot resurrect old credentials or dispatch its second exchange after logout', async (t) => {
   const entered = deferred(), release = deferred()
   const { service, calls } = setup(t, async ({ pathname }) => {
     if (pathname === '/event/luna/hk4e/sign') return reply({ retcode: -100 })
-    if (pathname.endsWith('/getCookieAccountInfoBySToken')) { entered.resolve(); await release.promise; return reply({ retcode: 0, data: { cookie_token: 'synthetic-stale-cookie' } }) }
+    if (pathname === exchangePath) { entered.resolve(); await release.promise; return exchangeReply(2) }
   })
   service.config.games.genshin = true
   service.run('manual'); await entered.promise
@@ -292,15 +315,14 @@ test('game automatic refresh cannot resurrect old credentials or dispatch its se
   assert.equal(service.state.auth, null)
   assert.equal(service.state.runtime.lastResult, null)
   assert.equal(service.state.runtime.lastError, null)
-  assert.equal(calls.some(({ pathname }) => pathname.endsWith('/getLTokenBySToken')), false)
+  assert.equal(calls.some(({ pathname, init }) => pathname === exchangePath && JSON.parse(init.body).dst_token_type === 4), false)
   assert.equal(calls.filter(({ pathname }) => pathname === '/event/luna/hk4e/sign').length, 1)
 })
 
 function smsReply(call, id = '123') {
   if (call.pathname.endsWith('/createLoginCaptcha')) return reply({ retcode: 0, data: { action_type: 'login', countdown: 60 } })
   if (call.pathname.endsWith('/loginByMobileCaptcha')) return reply({ retcode: 0, data: { token: { token_type: 1, token: 'v2_secret-stoken' }, user_info: { aid: id, mid: 'secret-mid' } } })
-  if (call.pathname.endsWith('/getLTokenBySToken')) return reply({ retcode: 0, data: { ltoken: 'v2_secret-ltoken' } })
-  if (call.pathname.endsWith('/getCookieAccountInfoBySToken')) return reply({ retcode: 0, data: { uid: id, cookie_token: 'v2_secret-cookie' } })
+  if (call.pathname === exchangePath) return exchangeReply(JSON.parse(call.init.body).dst_token_type, id)
   if (call.pathname === '/user/api/getUserFullInfo') return reply({ retcode: 0, data: { user: { user_info: { nickname: 'Synthetic login' } } } })
 }
 async function smsStart(service) {
@@ -481,13 +503,14 @@ for (const captcha of [false, true]) test(`combined run preserves independent sc
   }
 })
 
-for (const target of ['getCookieAccountInfoBySToken', 'getLTokenBySToken']) for (const retcode of [1034, -999]) {
+for (const target of [2, 4]) for (const retcode of [1034, -999]) {
   test(`game refresh CAPTCHA ${retcode} at ${target} stops remaining exchanges and all later writes`, async (t) => {
-    const { service, posts, calls, checkin } = setup(t, ({ pathname }) => {
+    const { service, posts, calls, checkin } = setup(t, ({ pathname, init }) => {
       if (pathname === '/event/luna/hk4e/sign') return reply({ retcode: -100 })
-      if (pathname.endsWith(target)) return reply({ retcode, message: 'secret-stoken https://secret.invalid' })
-      if (pathname.endsWith('getCookieAccountInfoBySToken')) return reply({ retcode: 0, data: { cookie_token: 'synthetic-derived-token' } })
-      if (pathname.endsWith('getLTokenBySToken')) return reply({ retcode: 0, data: { ltoken: 'synthetic-derived-ltoken' } })
+      if (pathname === exchangePath) {
+        const type = JSON.parse(init.body).dst_token_type
+        return type === target ? reply({ retcode, message: 'secret-stoken https://secret.invalid' }) : exchangeReply(type)
+      }
     })
     service.config.enabled = true
     service.config.games.genshin = true
@@ -500,7 +523,7 @@ for (const target of ['getCookieAccountInfoBySToken', 'getLTokenBySToken']) for 
     assert.equal(service.state.runtime.lastResult.results[1].outcome, 'skipped')
     assert.equal(posts().length, 0)
     assert.equal(calls.filter(({ pathname }) => pathname.endsWith('/sign')).length, 1)
-    assert.equal(calls.filter(({ pathname }) => pathname.startsWith('/account/auth/')).length, target === 'getCookieAccountInfoBySToken' ? 1 : 2)
+    assert.equal(calls.filter(({ pathname }) => pathname === exchangePath).length, target === 2 ? 1 : 2)
     assert.equal(calls.some(({ pathname }) => pathname === balancePath), false)
     assert.deepEqual(service.state.runtime.community.lastResult.results.map((item) => item.outcome), ['skipped'])
     assert.deepEqual(service.state.auth, originalAuth)
@@ -509,7 +532,7 @@ for (const target of ['getCookieAccountInfoBySToken', 'getLTokenBySToken']) for 
 }
 
 test('manual refresh CAPTCHA preserves auth and reports verification rather than expired SToken', async (t) => {
-  const { service, calls } = setup(t, ({ pathname }) => pathname.endsWith('getCookieAccountInfoBySToken') ? reply({ retcode: 1034 }) : undefined)
+  const { service, calls } = setup(t, ({ pathname }) => pathname === exchangePath ? reply({ retcode: 1034 }) : undefined)
   const originalAuth = structuredClone(service.state.auth)
   const result = await service.routeRefresh(request('refresh'))
   assert.equal(result.error?.code, 'captcha')

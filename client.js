@@ -76,6 +76,8 @@ window.__ModuleLoader__.load({
 .mys-log[data-level=error] .mys-log-text{color:var(--dsw-alias-state-error-primary)}
 .mys-empty{font-size:12px;color:var(--dsw-alias-label-tertiary)}
 .mys-overlay{position:fixed;inset:0;z-index:60;display:flex;align-items:center;justify-content:center;background:rgba(15,23,42,.45);padding:24px}
+.mys-captcha-viewport[data-active=false]{height:0;overflow:hidden}
+.mys-captcha-start{font:inherit;color:inherit;border:1px solid currentColor;background:transparent;border-radius:6px;padding:6px 12px;cursor:pointer}
 .mys-captcha-frame{width:100%;height:420px;border:0;background:#fff;border-radius:8px}
 .mys-dialog form{display:flex;flex-direction:column;gap:12px}
 .mys-dialog{max-height:calc(100dvh - 48px);overflow:auto;box-sizing:border-box;width:min(380px,100%);background:var(--dsw-alias-bg-layer-1,#fff);border-radius:14px;padding:20px;display:flex;flex-direction:column;gap:12px;box-shadow:0 24px 60px rgba(0,0,0,.35);color:var(--dsw-alias-label-primary)}
@@ -145,14 +147,23 @@ window.__ModuleLoader__.load({
       smsGameValidation: "新登录未保存：游戏凭据只读校验失败。已有登录未被替换，请取消后核对账号并重试。",
       smsCommunityValidation: "新登录未保存：已启用社区的凭据只读校验失败。已有登录未被替换，请取消后核对账号与社区设置。",
       smsOutcomeUnknown: "请求可能已经送达，但结果未确认。不会自动重试；请先等待短信或到官方客户端核对，不要立即重复发送。",
+      smsStage: "失败阶段", smsRetcode: "官方返回码",
+      smsStage_sms: "发送短信", smsStage_login: "短信登录", smsStage_ltoken: "换取 LToken", smsStage_cookie: "换取 Cookie 凭据",
       smsRejected: "官方接口明确拒绝了本次请求。不会自动重试；请取消后检查账号状态，必要时前往官方客户端处理。",
       smsInvalidResponse: "官方响应格式不符合预期，本次未保存新登录。请取消后检查官方服务状态。",
       smsNetwork: "未能完成官方接口的只读请求，本次未保存新登录。请检查网络后重试。",
       smsExpired: "本轮登录已过期，请取消后重新登录。",
       smsCountdown: "{seconds} 秒后可重新发送",
-      smsCodeSent: "短信已发送，请输入验证码。",
+      smsCodeSent: "官方已确认发送。请查看手机短信。",
+      smsSendPending: "等待官方确认。请勿重复发送。",
+      smsSendChallenge: "需要人工验证。请在下方完成验证。",
+      smsSendChallengeUnavailable: "需要人工验证，但验证框未加载。请取消后重新登录。",
+      smsSendUnknown: "结果未确认。请先查看短信，不要立即重发。",
+      smsSendRejected: "本次发送请求未获受理。",
       smsVerification: "官方人工验证",
       smsWidgetLoading: "正在加载官方验证…",
+      smsWidgetStart: "开始人工验证", smsWidgetOpening: "正在打开官方验证…",
+      smsWidgetOpenFailed: "官方验证界面未能打开。请取消后重新登录；不会自动重发短信。",
       smsWidgetFailed: "人工验证未完成或加载失败。请取消后重新登录；不会自动发送短信。",
       smsSuccess: "登录成功，凭据已完成只读校验。",
       smsSuccessWarning: "游戏凭据校验通过；社区只读校验未通过，请查看社区状态。",
@@ -187,6 +198,9 @@ window.__ModuleLoader__.load({
       intro: '在同一处选择游戏与大别野签到项目，手动和定时按已保存的项目执行。登录凭据只保存在本机。',
       account: '账号',
       accountDetails: '账号详情与诊断',
+      sendDiag: '最近一次发送诊断', sendDiagEmpty: '尚未记录发送尝试。',
+      diag_start: '创建登录流程', diag_send: '发送短信', diag_notSent: '未提交发送', diag_confirmed: '官方已确认发送',
+      diag_challenge: '需要人工验证', diag_rejected: '请求未获受理', diag_unknown: '发送结果未确认', diagPoll: '查询发送状态失败',
       checkinSettings: '签到设置',
       showTargets: '查看签到项目',
       showAccount: '查看当前账号',
@@ -367,14 +381,23 @@ window.__ModuleLoader__.load({
       smsGameValidation: "New login not saved: read-only game credential validation failed. Existing login unchanged. Cancel, check the account and try again.",
       smsCommunityValidation: "New login not saved: required community credential validation failed. Existing login unchanged. Cancel and check the account and community settings.",
       smsOutcomeUnknown: "The request may have arrived, but its result is unknown. No automatic retry. Wait for the SMS or check the official app; do not immediately send again.",
+      smsStage: "Failed step", smsRetcode: "Official return code",
+      smsStage_sms: "Send SMS", smsStage_login: "SMS login", smsStage_ltoken: "Exchange LToken", smsStage_cookie: "Exchange cookie credentials",
       smsRejected: "The official API rejected this request. No automatic retry. Cancel and check the account in the official app if needed.",
       smsInvalidResponse: "Unexpected official response. New login not saved. Cancel and check the official service status.",
       smsNetwork: "The official read-only request could not complete. New login not saved. Check your network before retrying.",
       smsExpired: "This login expired. Cancel and start again.",
       smsCountdown: "Resend available in {seconds}s",
-      smsCodeSent: "SMS sent. Enter the verification code.",
+      smsCodeSent: "The service confirmed sending the SMS. Check your phone.",
+      smsSendPending: "Waiting for confirmation. Do not resend yet.",
+      smsSendChallenge: "Human verification required. Complete the verification below.",
+      smsSendChallengeUnavailable: "Human verification required, but the widget is unavailable. Cancel and start again.",
+      smsSendUnknown: "Sending is unconfirmed. Check your messages before resending.",
+      smsSendRejected: "This send request was not accepted.",
       smsVerification: "Official manual verification",
       smsWidgetLoading: "Loading official verification…",
+      smsWidgetStart: "Start verification", smsWidgetOpening: "Opening official verification…",
+      smsWidgetOpenFailed: "The verification panel could not open. Cancel and sign in again. No SMS will be resent automatically.",
       smsWidgetFailed: "Verification was not completed or could not load. Cancel and sign in again. No SMS was sent automatically.",
       smsSuccess: "Signed in; read-only credential checks passed.",
       smsSuccessWarning: "Game credentials verified; the community check did not pass. See community status.",
@@ -409,6 +432,9 @@ window.__ModuleLoader__.load({
       intro: 'Choose games and Dabieye in one place. Manual and scheduled check-ins use your saved selection. Credentials stay on this device.',
       account: 'Account',
       accountDetails: 'Account details and diagnostics',
+      sendDiag: 'Latest SMS send diagnostic', sendDiagEmpty: 'No send attempt recorded yet.',
+      diag_start: 'Create login flow', diag_send: 'Send SMS', diag_notSent: 'Send not submitted', diag_confirmed: 'Service confirmed sending',
+      diag_challenge: 'Human verification required', diag_rejected: 'Request not accepted', diag_unknown: 'Send outcome unknown', diagPoll: 'Send status query failed',
       checkinSettings: 'Check-in settings',
       showTargets: 'View check-in targets',
       showAccount: 'View current account',
@@ -986,43 +1012,97 @@ window.__ModuleLoader__.load({
       return panel
     }
 
+    const sendDiagKey = 'mys-checkin:last-sms-diagnostic:v1'
+    const sendCodes = new Set(['bad-phone', 'bad-request', 'flow-changed', 'flow-expired', 'flow-busy', 'flow-state', 'sms-cooldown',
+      'invalid-response', 'invalid-challenge', 'invalid-proof', 'challenge-failed', 'challenge-expired', 'challenge-stale', 'challenge-limit',
+      'outcome-unknown', 'network-error', 'upstream-rejected', 'rate-limited', 'login-failed', 'session-changed'])
+    const challengeFields = new Set(['header', 'data', 'session_id', 'mmt_type', 'use_v4', 'gt', 'challenge', 'new_captcha', 'success', 'risk_type'])
+    let lastSendDiagnostic = null
+    // Always reconstruct a small record: neither responses nor free-form exceptions enter storage or the UI.
+    function safeSendDiagnostic(d) {
+      if (!d || !['start', 'send'].includes(d.step) || !['notSent', 'confirmed', 'challenge', 'rejected', 'unknown'].includes(d.result) ||
+          !Number.isSafeInteger(d.at) || d.at < 0 || d.at > 8640000000000000) return null
+      return { at: d.at, step: d.step, result: d.result, code: sendCodes.has(d.code) ? d.code : null,
+        ...(d.step === 'send' && d.code === 'invalid-challenge' && challengeFields.has(d.challengeField) ? { challengeField: d.challengeField } : {}),
+        retcode: Number.isInteger(d.retcode) && Math.abs(d.retcode) <= 2147483647 ? d.retcode : null, pollFailed: d.pollFailed === true }
+    }
+    function readSendDiagnostic() {
+      if (lastSendDiagnostic) return lastSendDiagnostic
+      try {
+        const raw = window.localStorage.getItem(sendDiagKey)
+        if (raw && raw.length <= 512) lastSendDiagnostic = safeSendDiagnostic(JSON.parse(raw))
+      } catch { /* unavailable desktop storage: keep this session's diagnostic in memory */ }
+      return lastSendDiagnostic
+    }
+
     /** Memory-only callbacks, shared by the account and community login CTAs. */
-    function createSmsController({ request, changed, confirmed, now = Date.now }) {
+    function createSmsController({ request, changed, confirmed, onDiagnostic = () => {}, now = Date.now }) {
       let state = null, generation = 0, revision = 0, locked = false
+      let diagnostic = null
+      const record = (step, result, code, details, pollFailed = false) => {
+        diagnostic = lastSendDiagnostic = safeSendDiagnostic({ at: now(), step, result, code, retcode: details?.retcode, challengeField: details?.challengeField, pollFailed })
+        try { window.localStorage.setItem(sendDiagKey, JSON.stringify(diagnostic)) } catch { /* optional persistence */ }
+        onDiagnostic(diagnostic)
+      }
       const publish = () => changed(state && { ...state })
       const cancelId = (flowId) => { if (flowId) void request('login/cancel', { flowId }).catch(() => {}) }
       const errorKey = (code) => ({ 'sms-code-invalid': 'smsWrongCode', 'sms-cooldown': 'smsCooldown', 'flow-expired': 'smsExpired', 'flow-changed': 'smsExpired', 'rate-limited': 'smsRateLimited', 'challenge-expired': 'smsExpired', 'official-action-required': 'smsOfficialAction', 'game-validation-failed': 'smsGameValidation', 'community-validation-failed': 'smsCommunityValidation', 'outcome-unknown': 'smsOutcomeUnknown', 'upstream-rejected': 'smsRejected', 'invalid-response': 'smsInvalidResponse', 'network-error': 'smsNetwork' })[code] ?? 'smsFailed'
+      const sendRejected = code => ['upstream-rejected', 'rate-limited', 'sms-cooldown'].includes(code)
+      const setError = (key, diagnostic) => {
+        state.error = key
+        state.stage = key && ['sms', 'login', 'ltoken', 'cookie'].includes(diagnostic?.stage) ? diagnostic.stage : null
+        state.retcode = key && Number.isInteger(diagnostic?.retcode) && Math.abs(diagnostic.retcode) <= 2147483647 ? diagnostic.retcode : null
+      }
       const accept = (data) => {
         if (data.state === 'confirmed' && data.ok === true) {
           generation++; revision++; locked = false; state = null; publish(); confirmed(data); return
         }
         if (data.flow && state.flow && data.flow.flowId !== state.flow.flowId) {
-          state.challenge = null; state.error = 'smsExpired'; return
+          state.challenge = null; setError('smsExpired'); return
         }
         if (Object.hasOwn(data, 'flow')) state.flow = data.flow
         if (data.ok === false && (data.flow === null || ['official-action-required', 'game-validation-failed', 'community-validation-failed'].includes(data.error?.code))) state.fatal = true
         state.challenge = data.challenge ?? (state.challenge?.challengeId === data.flow?.challenge?.challengeId ? state.challenge : null)
-        state.error = data.ok === false ? errorKey(data.error?.code) : null
+        setError(data.ok === false ? errorKey(data.error?.code) : null, data.diagnostic)
       }
       const perform = async (path, payload) => {
         if (!state || locked || state.fatal) return
-        locked = true; state.busy = true; state.error = null
+        const sending = path === 'login/send' || (path === 'login/challenge' && state.flow?.challenge?.checkpoint === 'sms')
+        locked = true; state.busy = true; setError(null)
         const gen = generation
         revision++; publish()
         try {
           if (path === 'login/send' && !state.flow) {
+            record('start', 'notSent')
             const start = await request('login/start', { phone: state.phone })
             if (generation !== gen) { cancelId(start.flow?.flowId); return }
             state.phone = ''
             accept(start)
-            if (!start.ok || !state.flow) return
+            if (!start.ok || !state.flow) { record('start', 'notSent', start.error?.code, start.diagnostic); return }
             payload = { flowId: state.flow.flowId }
+          }
+          if (sending) {
+            record('send', 'unknown')
+            state.sendHint = 'smsSendPending'
+            state.previousResendAt = path === 'login/send' ? state.flow?.resendAt ?? 0 : null
+            publish()
           }
           const data = await request(path, payload)
           if (generation !== gen) return
           state.code = ''
           accept(data)
-        } catch { if (generation === gen && state) { state.code = ''; state.error = 'smsFailed' } }
+          if (sending && state) {
+            state.sendHint = data.ok === true && data.flow?.status === 'code-sent' ? 'smsCodeSent'
+              : data.ok === true && data.flow?.challenge?.checkpoint === 'sms' ? (state.challenge ? 'smsSendChallenge' : 'smsSendChallengeUnavailable')
+              : sendRejected(data.error?.code) ? 'smsSendRejected' : 'smsSendUnknown'
+            const result = state.sendHint === 'smsCodeSent' ? 'confirmed' : state.sendHint === 'smsSendRejected' ? 'rejected'
+              : state.sendHint.startsWith('smsSendChallenge') ? 'challenge' : 'unknown'
+            record('send', result, data.error?.code, data.diagnostic)
+          }
+        } catch { if (generation === gen && state) {
+          state.code = ''; setError('smsFailed')
+          if (sending && state.sendHint === 'smsSendPending') state.sendHint = 'smsSendUnknown'
+        } }
         finally { if (generation === gen && state) { locked = false; state.busy = false; revision++; publish() } }
       }
       const cancel = () => {
@@ -1030,18 +1110,19 @@ window.__ModuleLoader__.load({
         generation++; revision++; locked = false; state = null; publish(); cancelId(id)
       }
       return {
-        open() { if (state) return; generation++; state = { phone: '', code: '', flow: null, challenge: null, busy: false, error: null }; publish() },
+        open() { if (state) return; diagnostic = null; generation++; state = { phone: '', code: '', flow: null, challenge: null, busy: false, error: null }; publish() },
         setPhone(value) { if (state && !locked && !state.flow) { state.phone = value; publish() } },
         setCode(value) { if (state && !locked) { state.code = value; publish() } },
         send() {
           if (!state || locked) return
-          if (!state.flow && !/^1[3-9]\d{9}$/.test(state.phone)) { state.error = 'smsBadPhone'; publish(); return }
+          if (!state.flow && !/^1[3-9]\d{9}$/.test(state.phone)) { setError('smsBadPhone'); publish(); return }
           if (state.flow?.resendAt > now()) return
           return perform('login/send', state.flow ? { flowId: state.flow.flowId } : undefined)
         },
         submit() {
           if (!state || locked) return
-          if (!state.flow || !/^\d{6}$/.test(state.code)) { state.error = 'smsBadCode'; publish(); return }
+          if (!state.flow || !/^\d{6}$/.test(state.code)) { setError('smsBadCode'); publish(); return }
+          diagnostic = null // Later login/credential errors do not describe the SMS send.
           return perform('login/submit', { flowId: state.flow.flowId, code: state.code })
         },
         solve(challengeId, result) {
@@ -1049,45 +1130,73 @@ window.__ModuleLoader__.load({
           state.challenge = null
           return perform('login/challenge', { flowId: state.flow.flowId, challengeId, result })
         },
-        widgetError() { if (state) { revision++; state.challenge = null; state.code = ''; state.error = 'smsWidgetFailed'; state.fatal = true; publish() } },
+        widgetError(reason) { if (state) { revision++; state.challenge = null; state.code = ''; setError(reason === 'open-failed' ? 'smsWidgetOpenFailed' : 'smsWidgetFailed'); state.fatal = true; publish() } },
         async readState() {
           if (!state?.flow || locked || state.fatal) return
           const id = state.flow.flowId, gen = generation, rev = revision
           try {
             const data = await request('login/state')
             if (gen !== generation || rev !== revision || !state) return
-            if (!data.flow || data.flow.flowId !== id) { state.challenge = null; state.error = 'smsExpired'; state.flow = { ...state.flow, status: 'expired' } }
+            if (!data.flow || data.flow.flowId !== id) { state.challenge = null; setError('smsExpired'); state.flow = { ...state.flow, status: 'expired' } }
             else {
               state.flow = data.flow
               if (state.challenge?.challengeId !== data.flow.challenge?.challengeId) state.challenge = null
-              if (data.flow.status === 'expired') state.error = 'smsExpired'
+              if (data.flow.status === 'expired') setError('smsExpired')
+              else if (state.sendHint === 'smsSendUnknown' && data.flow.status === 'code-sent' && !data.flow.error &&
+                (state.previousResendAt === null || data.flow.resendAt > state.previousResendAt)) {
+                state.sendHint = 'smsCodeSent'; setError(null)
+                record('send', 'confirmed')
+              } else if (state.sendHint === 'smsSendUnknown' && data.flow.status === 'phone-ready' && sendRejected(data.flow.error?.code) &&
+                (state.previousResendAt === null || data.flow.resendAt > state.previousResendAt)) {
+                state.sendHint = 'smsSendRejected'; setError(errorKey(data.flow.error.code), data.flow.error.diagnostic)
+                record('send', 'rejected', data.flow.error.code, data.flow.error.diagnostic)
+              } else if (data.flow.status === 'verification-required' && data.flow.challenge?.checkpoint === 'sms') {
+                state.sendHint = state.challenge ? 'smsSendChallenge' : 'smsSendChallengeUnavailable'
+                if (diagnostic && diagnostic.result !== 'challenge') record('send', 'challenge')
+              }
             }
             publish()
-          } catch { if (gen === generation && rev === revision && state) { state.error = 'smsFailed'; publish() } }
+          } catch { if (gen === generation && rev === revision && state) {
+            if (diagnostic && !diagnostic.pollFailed) record(diagnostic.step, diagnostic.result, diagnostic.code, diagnostic, true)
+            setError('smsFailed'); publish()
+          } }
         },
         cancel, dispose: cancel,
       }
     }
 
-    function createCaptchaBridge({ getWindow, nonce, challenge, onResult, onError, onReady = () => {}, now = Date.now }) {
-      let done = false
+    function createCaptchaBridge({ getWindow, nonce, challenge, onResult, onError, onReady = () => {}, onPhase = () => {}, now = Date.now,
+      arm = (fn, ms) => setTimeout(fn, ms), disarm = timer => clearTimeout(timer) }) {
+      let done = false, phase = 'loading', timer = null
+      const clearOpen = () => { if (timer !== null) disarm(timer); timer = null }
+      const fail = () => { if (!done) { done = true; clearOpen(); onError(phase === 'opening' ? 'open-failed' : 'widget-failed') } }
       const send = (data) => getWindow()?.postMessage({ ...data, nonce }, '*')
       return {
         load() {
-          if (done || now() >= challenge.expiresAt) { onError(); return }
+          if (done) return
+          if (now() >= challenge.expiresAt) { fail(); return }
           const config = {}
           for (const key of ['captchaId', 'challenge', 'newCaptcha', 'offline', 'riskType', 'userInfo', 'language']) {
             if (Object.hasOwn(challenge.config, key)) config[key] = challenge.config[key]
           }
           send({ type: 'mys-captcha:init', version: challenge.version, config })
         },
+        open() {
+          if (done || phase !== 'ready') return
+          if (now() >= challenge.expiresAt) { fail(); return }
+          phase = 'opening'; onPhase(phase)
+          timer = arm(fail, Math.min(12000, challenge.expiresAt - now()))
+          try { send({ type: 'mys-captcha:open' }) } catch { fail() }
+        },
         receive(event) {
           if (done || now() >= challenge.expiresAt || event.source !== getWindow()) return
           const data = event.data
           if (!data || data.nonce !== nonce) return
-          if (data.type === 'mys-captcha:ready') { onReady(); return }
-          if (data.type === 'mys-captcha:error') { done = true; onError(); return }
-          if (data.type !== 'mys-captcha:success') return
+          if (data.type === 'mys-captcha:ready' && phase === 'loading') { phase = 'ready'; onReady(); onPhase(phase); return }
+          if (data.type === 'mys-captcha:opened' && phase === 'opening') { clearOpen(); phase = 'opened'; onPhase(phase); return }
+          if (data.type === 'mys-captcha:error') { fail(); return }
+
+          if (data.type !== 'mys-captcha:success' || !['opening', 'opened'].includes(phase)) return
           const fields = challenge.version === 'gt4' ? ['captcha_id', 'lot_number', 'pass_token', 'gen_time', 'captcha_output'] : ['geetest_challenge', 'geetest_validate', 'geetest_seccode']
           const raw = data.result, result = {}
           if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return
@@ -1097,20 +1206,20 @@ window.__ModuleLoader__.load({
             result[field] = value
           }
           if (JSON.stringify(result).length > 12288) return
-          done = true; onResult(challenge.challengeId, result)
+          done = true; clearOpen(); onResult(challenge.challengeId, result)
         },
-        dispose() { done = true; send({ type: 'mys-captcha:destroy' }) },
+        dispose() { done = true; clearOpen(); send({ type: 'mys-captcha:destroy' }) },
       }
     }
 
     function CaptchaFrame({ t, challenge, onResult, onError }) {
       const frame = useRef(null), bridge = useRef(null)
-      const [html, setHtml] = useState(null)
+      const [html, setHtml] = useState(null), [phase, setPhase] = useState('loading')
       const callbacks = useRef({ onResult, onError }); callbacks.current = { onResult, onError }
       useEffect(() => {
         let stopped = false, timeout
         const current = createCaptchaBridge({ getWindow: () => frame.current?.contentWindow, nonce: crypto.randomUUID(), challenge,
-          onResult: (...args) => callbacks.current.onResult(...args), onReady: () => clearTimeout(timeout), onError: () => { clearTimeout(timeout); callbacks.current.onError() } })
+          onResult: (...args) => callbacks.current.onResult(...args), onReady: () => clearTimeout(timeout), onPhase: setPhase, onError: reason => { clearTimeout(timeout); callbacks.current.onError(reason) } })
         bridge.current = current
         window.addEventListener('message', current.receive)
         // Fetch through the authenticated owner carrier. Desktop uses IPC fetch,
@@ -1128,19 +1237,23 @@ window.__ModuleLoader__.load({
         const expiry = setTimeout(() => { if (!stopped) callbacks.current.onError() }, Math.max(0, challenge.expiresAt - Date.now()))
         return () => { stopped = true; clearTimeout(expiry); clearTimeout(timeout); current.dispose(); window.removeEventListener('message', current.receive); bridge.current = null }
       }, [challenge.challengeId])
-      return html === null ? h('div', { role: 'status' }, t('smsWidgetLoading')) : h('iframe', {
-        ref: frame, title: t('smsVerification'), sandbox: 'allow-scripts', referrerPolicy: 'no-referrer', srcDoc: html,
-        className: 'mys-captcha-frame', onLoad: () => bridge.current?.load(), onError,
-      })
+      return h('div', null,
+        phase === 'ready' ? h('button', { type: 'button', className: 'mys-captcha-start', onClick: () => bridge.current?.open() }, t('smsWidgetStart'))
+          : phase !== 'opened' ? h('div', { role: 'status', className: 'mys-hint' }, t(phase === 'opening' ? 'smsWidgetOpening' : 'smsWidgetLoading')) : null,
+        html !== null ? h('div', { className: 'mys-captcha-viewport', 'data-active': ['opening', 'opened'].includes(phase) }, h('iframe', {
+          ref: frame, title: t('smsVerification'), sandbox: 'allow-scripts', referrerPolicy: 'no-referrer', srcDoc: html,
+          tabIndex: phase === 'opened' ? 0 : -1, className: 'mys-captcha-frame', onLoad: () => bridge.current?.load(), onError,
+        })) : null)
     }
 
     function useMysLogin({ t, refresh, onNotice }) {
       const [session, setSession] = useState(null)
+      const [sendDiagnostic, onDiagnostic] = useState(readSendDiagnostic)
       const refs = useRef({ refresh, onNotice, t }); refs.current = { refresh, onNotice, t }
       const controller = useRef(null)
       if (!controller.current) controller.current = createSmsController({
         request: (path, body) => requestJson(path, body === undefined ? undefined : { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }),
-        changed: setSession,
+        changed: setSession, onDiagnostic,
         confirmed: (data) => { refs.current.onNotice?.(refs.current.t(data.warning ? 'smsSuccessWarning' : 'smsSuccess')); void refs.current.refresh?.() },
       })
       useEffect(() => () => controller.current.dispose(), [])
@@ -1149,7 +1262,13 @@ window.__ModuleLoader__.load({
         const timer = setInterval(() => { void controller.current.readState() }, 2000)
         return () => clearInterval(timer)
       }, [session?.flow?.flowId])
-      return { session, busy: session?.busy === true, controller: controller.current, startLogin: () => controller.current.open(), cancelLogin: () => controller.current.cancel() }
+      return { session, sendDiagnostic, busy: session?.busy === true, controller: controller.current, startLogin: () => controller.current.open(), cancelLogin: () => controller.current.cancel() }
+    }
+
+    function SendDiagnostic({ t, value }) {
+      return h('div', { className: 'mys-meta' }, h('strong', null, t('sendDiag')), h('div', null, value ? [formatTime(value.at),
+        t(`diag_${value.step}`), t(`diag_${value.result}`), value.code, value.retcode !== null ? `retcode: ${value.retcode}` : null,
+        value.challengeField ? `challengeField: ${value.challengeField}` : null, value.pollFailed ? t('diagPoll') : null].filter(Boolean).join(' · ') : t('sendDiagEmpty')))
     }
 
     function SmsDialog({ t, session, controller }) {
@@ -1173,6 +1292,10 @@ window.__ModuleLoader__.load({
       const terminal = session.fatal || (flow && (['error', 'expired', 'candidate-ready'].includes(flow.status) || flow.expiresAt <= now))
       const disabled = session.busy || flow?.busy || terminal || !!session.challenge
       const codeReady = flow?.status === 'code-sent'
+      const sendHint = session.sendHint || (codeReady ? 'smsCodeSent' : null)
+      const sendStatus = sendHint === 'smsSendUnknown' || sendHint === 'smsSendRejected' ? sendHint
+        : terminal ? (session.error ? null : 'smsExpired')
+        : session.busy && sendHint !== 'smsSendPending' ? 'smsBusy' : sendHint
       useEffect(() => {
         const root = dialog.current
         if (!root) return
@@ -1198,8 +1321,10 @@ window.__ModuleLoader__.load({
               value: flow ? flow.phoneMasked : session.phone, disabled: !!flow || session.busy, onChange: event => controller.setPhone(event.target.value) })),
             flow ? h('label', { className: 'mys-field' }, t('smsCode'), h('input', { className: 'mys-input', type: 'text', inputMode: 'numeric', autoComplete: 'one-time-code', maxLength: 6, value: session.code,
               disabled: !codeReady || disabled, onChange: event => controller.setCode(event.target.value) })) : null,
-            session.error ? h('div', { className: 'mys-banner', role: 'alert', 'data-tone': 'warn' }, t(session.error)) : null,
-            h('div', { role: 'status', 'aria-live': 'polite', className: 'mys-hint' }, session.busy ? t('smsBusy') : session.error ? '' : terminal ? t('smsExpired') : codeReady ? t('smsCodeSent') : ''),
+            session.error ? h('div', { className: 'mys-banner', role: 'alert', 'data-tone': 'warn' }, t(session.error),
+              session.stage ? h('div', null, `${t('smsStage')}: ${t(`smsStage_${session.stage}`)} (${session.stage})`) : null,
+              session.retcode != null ? h('div', null, `${t('smsRetcode')} (retcode): ${session.retcode}`) : null) : null,
+            h('div', { role: 'status', 'aria-live': 'polite', className: 'mys-hint' }, sendStatus ? t(sendStatus) : ''),
             seconds > 0 ? h('div', { className: 'mys-hint', 'aria-live': 'off' }, fill(t('smsCountdown'), { seconds })) : null,
             session.challenge ? h(CaptchaFrame, { key: session.challenge.challengeId, t, challenge: session.challenge, onResult: controller.solve, onError: controller.widgetError }) : null,
             h('div', { className: 'mys-dialog-foot' },
@@ -1665,6 +1790,7 @@ window.__ModuleLoader__.load({
           h('summary', null, t('accountDetails')),
           h('div', { className: 'mys-disclosure-body' },
             h(SettingsGroup, { title: t('account'), desc: t('accountDesc') },
+              h(SendDiagnostic, { t, value: loginFlow.sendDiagnostic }),
               login.uid ? h('div', { className: 'mys-meta' }, `${t('uid')} ${login.uid}`) : null,
               login.state !== 'anonymous' ? h('div', { className: 'mys-meta' },
                 [login.loginAt ? `${t('loginAt')} ${formatTime(login.loginAt)}` : null,

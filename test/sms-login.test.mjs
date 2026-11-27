@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { constants, generateKeyPairSync, privateDecrypt } from 'node:crypto'
+import { constants, createHash, generateKeyPairSync, privateDecrypt } from 'node:crypto'
 import { SmsLoginProtocol, SmsLoginError, SmsChallenge, encryptSmsField, validateCaptchaResult, makeAigis } from '../lib/sms-login.js'
 import { withRequestGuard } from '../lib/http.js'
 
@@ -108,23 +108,26 @@ test('login cannot accept unsafe/incomplete root tokens or official extra identi
   for (const _ of blocked) await assert.rejects(protocol.login({ phone, code: '123456', actionType: 'login' }), safeError('official-action-required'))
 })
 
-test('root exchanges use only the matching minimal root Cookie and reject identity mismatch', async t => {
-  const { protocol, calls } = setup(t, [response({ ltoken: 'LTOKEN_SECRET' }), response({ uid: '123456', cookie_token: 'COOKIE_SECRET' }), response({ uid: '654321', cookie_token: 'OTHER_SECRET' })])
-  assert.deepEqual(await protocol.getLToken({ root }), { ltoken: 'LTOKEN_SECRET' })
-  assert.deepEqual(await protocol.getCookieToken({ root }), { cookieToken: 'COOKIE_SECRET' })
-  await assert.rejects(protocol.getCookieToken({ root }), safeError('account-mismatch'))
-  assert.equal(calls[0].url, 'https://passport-api.mihoyo.com/account/auth/api/getLTokenBySToken')
-  assert.equal(calls[1].url, 'https://passport-api.mihoyo.com/account/auth/api/getCookieAccountInfoBySToken')
-  for (const c of calls) {
-    assert.equal(c.options.method, 'GET')
-    assert.equal(c.options.headers.Cookie, 'stuid=123456; stoken=v2_ROOT_SECRET; mid=mid_123')
+const ticket = (type, token, aid = root.aid, mid = root.mid) => ({ token: { token_type: type, token }, user_info: { aid, mid } })
+test('both V2 tickets use a signed POST and never put the source token in headers or URL', async t => {
+  const { protocol, calls } = setup(t, [response(ticket(2, 'opaqueLT')), response(ticket(4, 'opaqueCT'))])
+  assert.deepEqual(await protocol.getLToken({ root }), { ltoken: 'opaqueLT' })
+  assert.deepEqual(await protocol.getCookieToken({ root }), { cookieToken: 'opaqueCT' })
+  for (const [i, { url, options, body }] of calls.entries()) {
+    assert.equal(url, 'https://passport-api.mihoyo.com/account/ma-cn-session/app/exchange')
+    assert.equal(options.method, 'POST'); assert.equal(options.headers.Cookie, undefined)
+    assert.deepEqual(body, { dst_token_type: [2, 4][i], src_token: { token: root.stoken, token_type: 1 }, mid: root.mid })
+    const [time, nonce, hash] = options.headers.DS.split(',')
+    assert.match(nonce, /^[a-zA-Z0-9]{6}$/)
+    assert.equal(hash, createHash('md5').update(`salt=JwYDpKvLj6MrMqqYU6jTKF17KNO2PXoS&t=${time}&r=${nonce}&b=${options.body}&q=`).digest('hex'))
   }
 })
 
-test('an LToken response cannot smuggle another account uid or an unsafe credential', async t => {
-  const { protocol } = setup(t, [response({ uid: '654321', ltoken: 'OTHER_SECRET' }), response({ ltoken: 'token; account_id=654321' })])
-  await assert.rejects(protocol.getLToken({ root }), safeError('account-mismatch'))
-  await assert.rejects(protocol.getLToken({ root }), safeError('invalid-response'))
+test('V2 exchanges reject missing or conflicting identity, wrong ticket type and unsafe values', async t => {
+  const fixtures = [[ticket(2, 'OTHER', '654321'), 'account-mismatch'], [ticket(2, 'OTHER', root.aid, 'otherMID'), 'account-mismatch'],
+    [{ token: { token: 'secret', token_type: 2 } }, 'invalid-response'], [ticket(4, 'wrong-type'), 'invalid-response'], [ticket(2, 'token; bad'), 'invalid-response']]
+  const { protocol } = setup(t, fixtures.map(([d]) => response(d)))
+  for (const [, code] of fixtures) await assert.rejects(protocol.getLToken({ root }), safeError(code))
 })
 
 test('Aigis GT4/GT3 headers are parsed before business rejection with bounded render configuration', async t => {
@@ -143,8 +146,32 @@ test('Aigis GT4/GT3 headers are parsed before business rejection with bounded re
   }
 })
 
+test('GT4 permits empty optional widget fields and explicit flag encodings without weakening GT3', async t => {
+  const fixtures = [
+    [true, { use_v4: true, gt: 'site', challenge: '', risk_type: '' }],
+    [false, { use_v4: 1, gt: 'site', challenge: null, new_captcha: 1, success: '1' }],
+    [true, { use_v4: 'false', gt: 'site', challenge: 'CHALLENGE', new_captcha: '0', success: 0 }],
+  ]
+  const replies = fixtures.map(([nested, data]) => response(null, -3101, { 'x-rpc-aigis': JSON.stringify({ session_id: 'session', mmt_type: 1, data: nested ? JSON.stringify(data) : data }) }))
+  const { protocol, calls } = setup(t, replies)
+  for (const [i] of fixtures.entries()) await assert.rejects(protocol.sendSms({ phone }), e => {
+    assert.ok(e instanceof SmsChallenge); assert.equal(e.version, i === 2 ? 'gt3' : 'gt4'); assert.equal(e.config.riskType, null)
+    assert.equal(e.config.challenge, i === 2 ? 'CHALLENGE' : null); assert.equal(e.config.offline, i === 2); return true
+  })
+  assert.equal(calls.length, 3)
+})
+
+test('invalid challenges report only the offending static field, never its value', async t => {
+  const cases = [ ['use_v4', { use_v4: 'SECRET' }], ['challenge', { use_v4: false, challenge: '' }], ['gt', { gt: 'https://SECRET' }], ['risk_type', { risk_type: ['SECRET'] }] ]
+  const { protocol } = setup(t, cases.map(([, fields]) => response(null, -3101, { 'x-rpc-aigis': JSON.stringify({ session_id: 'SECRET', data: { gt: 'site', use_v4: true, ...fields } }) })))
+  for (const [field] of cases) await assert.rejects(protocol.sendSms({ phone }), e => {
+    assert.equal(e.code, 'invalid-challenge'); assert.equal(e.diagnostic.challengeField, field); assert.equal(e.diagnostic.stage, 'sms'); assert.equal(e.diagnostic.retcode, -3101); assert.doesNotMatch(JSON.stringify(e), /SECRET/); return true
+  })
+})
+
 test('malformed or oversized CAPTCHA config cannot escape as upstream text or become a valid challenge', async t => {
   const headers = [ '{UPSTREAM_SECRET', JSON.stringify({ session_id: 'x\r\nevil', data: '{}' }), JSON.stringify({ session_id: 'session', data: JSON.stringify({ gt: 'https://evil.invalid', use_v4: 'false' }) }), 'a'.repeat(17000) ]
+  headers.push(JSON.stringify({ session_id: 'session', mmt_type: 99, data: { gt: 'site', use_v4: true } }), JSON.stringify({ session_id: 'session', data: [] }))
   const { protocol } = setup(t, headers.map(value => response(null, -3101, { 'x-rpc-aigis': value })))
   for (const _ of headers) await assert.rejects(protocol.sendSms({ phone }), safeError('invalid-challenge'))
 })
